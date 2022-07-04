@@ -7,5 +7,6 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 from .common import save_model, build_progress_bar
+from .log import build_logger
 from .cache import CacheMaker
 from .visualize import visualize

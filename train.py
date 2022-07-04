@@ -8,23 +8,27 @@ from tqdm import tqdm
 from dataloader import build_dataloader
 from models import YOLOv3_Model
 from loss_function import YOLOv3_Loss
-from utils import save_model, build_progress_bar
+from utils import save_model, build_progress_bar, build_logger
 
 
 
 class Trainer():
     def __init__(self, data_path, config_path, save_path):
+        self.save_path = save_path
+        os.makedirs(self.save_path, exist_ok=True)
+
         with open(config_path) as f:
             item = yaml.load(f, Loader=yaml.FullLoader)
-
+        
+        self.log_level = item['LOG_LEVEL']
+        self.is_cuda = item['IS_CUDA']
         self.num_epochs = item['NUM_EPOCHS']
         self.input_size = item['INPUT_SIZE']
         self.batch_size = item['BATCH_SIZE']
-        self.is_cuda = item['IS_CUDA']
         self.lr = item['LEARNING_RATE']
         self.weight_decay = item['WEIGHT_DECAY']
-        self.device = torch.device('cuda' if torch.cuda.is_available() and self.is_cuda else 'cpu')
 
+        self.device = torch.device('cuda' if torch.cuda.is_available() and self.is_cuda else 'cpu')
         self.dataloaders, self.classname_list = build_dataloader(data_path=data_path, 
                                                                 image_size=(self.input_size, self.input_size), 
                                                                 batch_size=self.batch_size)
@@ -39,11 +43,9 @@ class Trainer():
         self.criterion = YOLOv3_Loss(config_path=config_path, model=self.model)
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         
-        self.save_path = save_path
-        self.save_name = save_path.name
-        os.makedirs(self.save_path, exist_ok=True)
+        self.logger = build_logger(log_path=self.save_path / 'logs', set_level=self.log_level)
         
-
+        
     def train_one_epoch(self):
         dataloader_pbars = build_progress_bar(self.dataloaders)
         loss_per_phase = defaultdict(float)
@@ -68,9 +70,6 @@ class Trainer():
                     self.optimizer.zero_grad()
                     losses[0].backward()
                     self.optimizer.step()
-                else:
-                    if index == 10:
-                        break
 
                 monitor_text = ''
                 for loss_name, loss_value in zip(loss_types, losses):
@@ -89,34 +88,33 @@ class Trainer():
 
     def run(self):
         best_score = float('inf')
-        global_pbar = tqdm(range(self.num_epochs))
+        global_pbar = tqdm(range(self.num_epochs), ncols=200)
         
         for self.epoch in global_pbar:
-            message = f'[Ep:{self.epoch+1:02d}/{self.num_epochs}]'
+            message = f'[Epoch:{self.epoch+1:02d}/{self.num_epochs}]'
             global_pbar.set_description(desc=message)
             loss_per_phase = self.train_one_epoch()
 
             train_loss = loss_per_phase["train_total"]
             val_loss = loss_per_phase["val_total"]
             monitor_text = f' Loss - Train: {train_loss:.2f}, Val: {val_loss:.2f}'
-            global_pbar.write(s=message + monitor_text)
+            self.logger.info(message + monitor_text)
             
-            if (self.epoch+1) % 5 == 0:
+            if (self.epoch+1) % 10 == 0:
                 save_model(model=self.model, 
-                           save_path=self.save_path / f'{self.save_name}_{self.epoch+1:02d}.pth')
-
+                           save_path=self.save_path / 'weights',
+                           model_name=f'{self.epoch+1:02d}.pth')
         global_pbar.close()
 
 
 
 if __name__ == "__main__":
-    import os
     from pathlib import Path
 
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[0]
 
-    EXP_NAME = 'test01'
+    EXP_NAME = 'test02'
     data_path = ROOT / 'data' / 'coco128.yml'
     config_path = ROOT / 'config' / 'yolov3.yml'
     save_path = ROOT / 'experiments' / EXP_NAME

@@ -79,8 +79,8 @@ class YOLOv3_Loss():
         th = torch.log(bh / anchor_h)
         
         predictions_form[..., :4] = torch.stack([tx, ty, tw, th], dim=-1)
-        predictions_form[..., 4] = prediction_each_scale[..., 4]
-        predictions_form[..., 5:] = prediction_each_scale[..., 5:] * prediction_each_scale[..., [4]]
+        predictions_form[..., 4] = prediction_each_scale[..., 4].clip(min=0., max=1.)
+        predictions_form[..., 5:] = (prediction_each_scale[..., 5:] * prediction_each_scale[..., [4]]).clip(min=0., max=1.)
         return predictions_form
 
 

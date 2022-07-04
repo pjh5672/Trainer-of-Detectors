@@ -16,6 +16,7 @@ def build_transformer(image_size=(448, 448)):
     # )
 
     transformers['train'] = album.Compose([
+        album.HorizontalFlip(p=0.5),
         album.Resize(height=image_size[0], width=image_size[1]),
         album.Normalize(mean=(0.485, 0.456, 0.406),std=(0.229, 0.224, 0.225)),
         ToTensorV2()],
