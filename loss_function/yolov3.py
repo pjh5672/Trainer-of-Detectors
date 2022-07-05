@@ -12,7 +12,6 @@ class YOLOv3_Loss():
             item = yaml.load(f, Loader=yaml.FullLoader)
 
         self.input_size = item['INPUT_SIZE']
-        self.batch_size = item['BATCH_SIZE']
         self.ignore_threshold = item['IGNORE_THRESH']
         self.coeff_coord = item['COEFFICIENT_COORD']
         self.coeff_noobj = item['COEFFICIENT_NOOBJ']
@@ -44,14 +43,14 @@ class YOLOv3_Loss():
             self.grid_size = int(np.sqrt(num_preds/self.num_anchor_per_scale))
             
             batch_pred_loss_form = self.transfrom_batch_pred_loss_form(prediction_each_scale, anchor_each_scale, stride_each_scale)
-            batch_target_loss_form, batch_target_noobj_loss_form = self.transform_batch_target_loss_form(targets, anchor_each_scale)
+            batch_target_obj_loss_form, batch_target_noobj_loss_form = self.transform_batch_target_loss_form(targets, anchor_each_scale)
 
-            object_mask = batch_target_loss_form[..., 4].eq(1.)
+            object_mask = batch_target_obj_loss_form[..., 4].eq(1.)
             noobject_mask = batch_target_noobj_loss_form.eq(1.)
-
-            coord_loss += self.mae_loss(batch_pred_loss_form[..., :4][object_mask], batch_target_loss_form[..., :4][object_mask])
-            obj_loss += self.bce_loss(batch_pred_loss_form[..., 4][object_mask], batch_target_loss_form[..., 4][object_mask])
-            cls_loss += self.bce_loss(batch_pred_loss_form[..., 5:][object_mask], batch_target_loss_form[..., 5:][object_mask])
+        
+            coord_loss += self.mae_loss(batch_pred_loss_form[..., :4][object_mask], batch_target_obj_loss_form[..., :4][object_mask])
+            obj_loss += self.bce_loss(batch_pred_loss_form[..., 4][object_mask], batch_target_obj_loss_form[..., 4][object_mask])
+            cls_loss += self.bce_loss(batch_pred_loss_form[..., 5:][object_mask], batch_target_obj_loss_form[..., 5:][object_mask])
             noobj_loss += self.bce_loss(batch_pred_loss_form[..., 4][noobject_mask], batch_target_noobj_loss_form[noobject_mask])
 
         coord_loss /= self.batch_size
@@ -65,6 +64,7 @@ class YOLOv3_Loss():
     def transfrom_batch_pred_loss_form(self, prediction_each_scale, anchor_each_scale, stride_each_scale):
         prediction_each_scale = prediction_each_scale.view(self.batch_size, self.num_anchor_per_scale, self.grid_size, self.grid_size, -1)
         predictions_form = torch.zeros_like(prediction_each_scale)
+
         anchor_w = anchor_each_scale[:, 0].view((1, self.num_anchor_per_scale, 1, 1))
         anchor_h = anchor_each_scale[:, 1].view((1, self.num_anchor_per_scale, 1, 1))
 
@@ -79,8 +79,8 @@ class YOLOv3_Loss():
         th = torch.log(bh / anchor_h)
         
         predictions_form[..., :4] = torch.stack([tx, ty, tw, th], dim=-1)
-        predictions_form[..., 4] = prediction_each_scale[..., 4].clip(min=0., max=1.)
-        predictions_form[..., 5:] = (prediction_each_scale[..., 5:] * prediction_each_scale[..., [4]]).clip(min=0., max=1.)
+        predictions_form[..., 4] = prediction_each_scale[..., 4]
+        predictions_form[..., 5:] = (prediction_each_scale[..., 5:] * prediction_each_scale[..., [4]])
         return predictions_form
 
 
@@ -93,7 +93,7 @@ class YOLOv3_Loss():
 
 
     def transform_target_loss_form(self, target, anchor_each_scale):
-        target_form = torch.zeros((self.num_anchor_per_scale, self.grid_size, self.grid_size, 5+self.num_classes), device=self.device)
+        target_obj_form = torch.zeros((self.num_anchor_per_scale, self.grid_size, self.grid_size, 5+self.num_classes), device=self.device)
         target_noobj_form = torch.ones((self.num_anchor_per_scale, self.grid_size, self.grid_size), device=self.device)
 
         for gt in target:
@@ -104,35 +104,40 @@ class YOLOv3_Loss():
 
             grid_x = xc * self.grid_size
             grid_y = yc * self.grid_size
-            tx = grid_x - int(grid_x)
-            ty = grid_y - int(grid_y)
-            
-            iou_with_anchor = [self.get_IoU_target_with_anchor([w*self.input_size, h*self.input_size], anchor) for anchor in anchor_each_scale]
+            bw = w * self.input_size
+            bh = h * self.input_size
+
+            iou_with_anchor = [self.get_IoU_target_with_anchor([bw, bh], anchor) for anchor in anchor_each_scale]
             iou_with_anchor = torch.stack(iou_with_anchor, dim=0)
             _, best_anchor_index = iou_with_anchor.max(dim=0)
-            
-            target_form[best_anchor_index, int(grid_y), int(grid_x), :4] = torch.Tensor([tx,ty,w,h])
-            target_form[best_anchor_index, int(grid_y), int(grid_x), 4] = 1.
-            target_form[best_anchor_index, int(grid_y), int(grid_x), 5 + cls_id.long()] = 1.
+            anchor_w, anchor_h = anchor_each_scale[best_anchor_index]
 
+            tx = grid_x - int(grid_x)
+            ty = grid_y - int(grid_y)
+            tw = torch.log(bw / anchor_w)
+            th = torch.log(bh / anchor_h)
+
+            target_obj_form[best_anchor_index, int(grid_y), int(grid_x), :4] = torch.Tensor([tx,ty,tw,th])
+            target_obj_form[best_anchor_index, int(grid_y), int(grid_x), 4] = 1.
+            target_obj_form[best_anchor_index, int(grid_y), int(grid_x), 5 + cls_id.long()] = 1.
             target_noobj_form[best_anchor_index, int(grid_y), int(grid_x)] = 0.
-            target_noobj_form[iou_with_anchor >= self.ignore_threshold, int(grid_y), int(grid_x)] = 0.
-        return target_form, target_noobj_form
+            target_noobj_form[iou_with_anchor > self.ignore_threshold, int(grid_y), int(grid_x)] = 0.
+        return target_obj_form, target_noobj_form
 
 
     def transform_batch_target_loss_form(self, targets, anchor_each_scale):
-        batch_target_loss_form = []
+        batch_target_obj_loss_form = []
         batch_target_noobj_loss_form = []
 
         for target in targets:
             target = torch.from_numpy(target)
-            target_form, target_noobj_form = self.transform_target_loss_form(target, anchor_each_scale)
-            batch_target_loss_form.append(target_form)
+            target_obj_form, target_noobj_form = self.transform_target_loss_form(target, anchor_each_scale)
+            batch_target_obj_loss_form.append(target_obj_form)
             batch_target_noobj_loss_form.append(target_noobj_form)
 
-        batch_target_loss_form = torch.stack(batch_target_loss_form, dim=0)
+        batch_target_obj_loss_form = torch.stack(batch_target_obj_loss_form, dim=0)
         batch_target_noobj_loss_form = torch.stack(batch_target_noobj_loss_form, dim=0)
-        return batch_target_loss_form, batch_target_noobj_loss_form
+        return batch_target_obj_loss_form, batch_target_noobj_loss_form
 
 
 
@@ -180,4 +185,3 @@ if __name__ == "__main__":
             print(total_loss)
             total_loss.backward()
             break
-
