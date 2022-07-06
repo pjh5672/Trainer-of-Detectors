@@ -27,7 +27,7 @@ class YOLOv3_Loss():
         self.anchors = [model.head.anchor_L, model.head.anchor_M, model.head.anchor_S]
         self.strides = [model.head.head_L.stride, model.head.head_M.stride, model.head.head_S.stride]
         self.num_anchors = len(self.anchors)
-        self.mae_loss = nn.MAELoss(reduction='sum')
+        self.mae_loss = nn.L1Loss(reduction='sum')
         self.bce_loss = nn.BCELoss(reduction='sum')
 
 
