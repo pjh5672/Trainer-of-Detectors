@@ -57,7 +57,7 @@ class Dataset():
         if self.transformer:
             transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             image = transformed_data['image']
-            bboxes = np.array(transformed_data['bboxes'])
+            bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)
             class_ids = np.array(transformed_data['class_ids'])
 
             if len(class_ids) == 0:

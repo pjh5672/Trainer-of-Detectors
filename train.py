@@ -41,8 +41,8 @@ class Trainer():
         self.model = self.model.to(self.device)
 
         self.criterion = YOLOv3_Loss(config_path=config_path, model=self.model)
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
         self.logger = build_logger(log_path=self.save_path / 'logs', set_level=self.log_level)
         
         
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[0]
 
-    EXP_NAME = 'test04'
+    EXP_NAME = 'test05'
     data_path = ROOT / 'data' / 'coco128.yml'
     config_path = ROOT / 'config' / 'yolov3.yml'
     save_path = ROOT / 'experiments' / EXP_NAME
