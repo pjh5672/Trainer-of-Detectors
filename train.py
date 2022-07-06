@@ -49,7 +49,7 @@ class Trainer():
     def train_one_epoch(self):
         dataloader_pbars = build_progress_bar(self.dataloaders)
         loss_per_phase = defaultdict(float)
-        loss_types = ['total', 'coord', 'obj', 'cls', 'noobj']
+        loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
 
         for phase in ['train', 'val']:
             if phase == 'train':

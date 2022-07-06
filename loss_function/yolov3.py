@@ -59,8 +59,6 @@ class YOLOv3_Loss():
             loss_obj = self.bce_loss(pred_obj[b_obj_mask], b_target_obj[b_obj_mask])
             loss_noobj = self.bce_loss(pred_obj[b_noobj_mask], b_target_obj[b_noobj_mask])
             loss_cls = self.bce_loss(pred_cls[b_obj_mask], b_target_cls[b_obj_mask])
-
-            print(loss_tx.item(), loss_ty.item(), loss_tw.item(), loss_th.item(), loss_obj.item(), loss_noobj.item(), loss_cls.item())
             
             coord_loss += (loss_tx + loss_ty + loss_tw + loss_th)
             obj_loss += loss_obj
