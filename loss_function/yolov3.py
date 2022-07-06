@@ -27,7 +27,7 @@ class YOLOv3_Loss():
         self.anchors = [model.head.anchor_L, model.head.anchor_M, model.head.anchor_S]
         self.strides = [model.head.head_L.stride, model.head.head_M.stride, model.head.head_S.stride]
         self.num_anchors = len(self.anchors)
-        self.mse_loss = nn.MSELoss(reduction='sum')
+        self.mae_loss = nn.MAELoss(reduction='sum')
         self.bce_loss = nn.BCELoss(reduction='sum')
 
 
@@ -52,10 +52,10 @@ class YOLOv3_Loss():
             b_obj_mask = b_obj_mask.type(torch.BoolTensor)
             b_noobj_mask = b_noobj_mask.type(torch.BoolTensor)
 
-            loss_tx = self.mse_loss(pred_tx[b_obj_mask], b_target_tx[b_obj_mask])
-            loss_ty = self.mse_loss(pred_ty[b_obj_mask], b_target_ty[b_obj_mask])
-            loss_tw = self.mse_loss(pred_tw[b_obj_mask], b_target_tw[b_obj_mask])
-            loss_th = self.mse_loss(pred_th[b_obj_mask], b_target_th[b_obj_mask])
+            loss_tx = self.mae_loss(pred_tx[b_obj_mask], b_target_tx[b_obj_mask])
+            loss_ty = self.mae_loss(pred_ty[b_obj_mask], b_target_ty[b_obj_mask])
+            loss_tw = self.mae_loss(pred_tw[b_obj_mask], b_target_tw[b_obj_mask])
+            loss_th = self.mae_loss(pred_th[b_obj_mask], b_target_th[b_obj_mask])
             loss_obj = self.bce_loss(pred_obj[b_obj_mask], b_target_obj[b_obj_mask])
             loss_noobj = self.bce_loss(pred_obj[b_noobj_mask], b_target_obj[b_noobj_mask])
             loss_cls = self.bce_loss(pred_cls[b_obj_mask], b_target_cls[b_obj_mask])
