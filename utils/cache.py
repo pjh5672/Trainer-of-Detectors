@@ -38,7 +38,7 @@ class CacheMaker():
     
 
     def cache_labels(self, cache_path, version):
-        pbar = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths))
+        pbar = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=200)
         
         x = {}
         for (image_path, label_path) in pbar:

@@ -15,8 +15,6 @@ def build_progress_bar(dataloaders):
         progress_bar[phase] = tqdm(iterable=dataloaders[phase],
                                    total=len(dataloaders[phase]),
                                    desc=f'[Phase:{phase.upper()}]',
-                                   leave=False,
-                                   ncols=200)
+                                   leave=False, ncols=200)
     return progress_bar
-
 

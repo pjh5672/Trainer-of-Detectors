@@ -1,13 +1,13 @@
 import yaml
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
+
 
 
 class YOLOv3_Loss():
     def __init__(self, config_path, model):
         super().__init__()
-
         with open(config_path) as f:
             item = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -22,13 +22,39 @@ class YOLOv3_Loss():
 
         dummy_x = torch.randn(1, 3, self.input_size, self.input_size).to(self.device) 
         with torch.no_grad():
-            _ = model(dummy_x)
+            self.dummy_y = model(dummy_x)
 
         self.anchors = [model.head.anchor_L, model.head.anchor_M, model.head.anchor_S]
         self.strides = [model.head.head_L.stride, model.head.head_M.stride, model.head.head_S.stride]
         self.num_anchors = len(self.anchors)
         self.mae_loss = nn.L1Loss(reduction='sum')
         self.bce_loss = nn.BCELoss(reduction='sum')
+
+
+    def check_best_possible_recall(self, train_dataloader):
+        total_num_target = 0
+        total_num_assigned_anchor = 0
+
+        for index, mini_batch in enumerate(train_dataloader):
+            targets = mini_batch[1]
+            num_assigned_anchor = 0
+            for scale_index in range(self.num_anchors):
+                anchor_each_scale = self.anchors[scale_index]
+                stride_each_scale = self.strides[scale_index]
+                dummy_y_each_scale = self.dummy_y[scale_index]
+                self.batch_size, num_preds, _ = dummy_y_each_scale.shape
+                self.grid_size = int(np.sqrt(num_preds/self.num_anchor_per_scale))
+                
+                b_obj_mask, _, _, _, _, _, _ = self.transform_batch_target_loss_form(targets, anchor_each_scale)
+                
+                num_assigned_anchor += b_obj_mask.sum().item()
+            total_num_target += len(np.concatenate(targets, axis=0))
+            total_num_assigned_anchor += (num_assigned_anchor / self.num_anchors)
+        total_num_assigned_anchor = int(total_num_assigned_anchor)
+        best_possible_recall = round(total_num_assigned_anchor / total_num_target, 4)
+        del self.dummy_y
+        torch.cuda.empty_cache()
+        return best_possible_recall, total_num_assigned_anchor, total_num_target
 
 
     def __call__(self, predictions, targets):
@@ -47,7 +73,8 @@ class YOLOv3_Loss():
             pred_cls = prediction_each_scale[..., 5:]
 
             pred_tx, pred_ty, pred_tw, pred_th = self.transfrom_batch_pred_loss_form(pred_box, anchor_each_scale, stride_each_scale)
-            b_obj_mask, b_noobj_mask, b_target_tx, b_target_ty, b_target_tw, b_target_th, b_target_cls = self.transform_batch_target_loss_form(targets, anchor_each_scale)
+            target_loss_forms = self.transform_batch_target_loss_form(targets, anchor_each_scale)
+            b_obj_mask, b_noobj_mask, b_target_tx, b_target_ty, b_target_tw, b_target_th, b_target_cls = target_loss_forms
             b_target_obj = b_obj_mask.float()
             b_obj_mask = b_obj_mask.type(torch.BoolTensor)
             b_noobj_mask = b_noobj_mask.type(torch.BoolTensor)
@@ -59,13 +86,13 @@ class YOLOv3_Loss():
             loss_obj = self.bce_loss(pred_obj[b_obj_mask], b_target_obj[b_obj_mask])
             loss_noobj = self.bce_loss(pred_obj[b_noobj_mask], b_target_obj[b_noobj_mask])
             loss_cls = self.bce_loss(pred_cls[b_obj_mask], b_target_cls[b_obj_mask])
-            
+
             coord_loss += (loss_tx + loss_ty + loss_tw + loss_th)
             obj_loss += loss_obj
             noobj_loss += loss_noobj
             cls_loss += loss_cls
             total_loss += self.coeff_coord * (loss_tx + loss_ty + loss_tw + loss_th) + \
-                            loss_obj + self.coeff_noobj * loss_noobj + loss_cls
+                          loss_obj + self.coeff_noobj * loss_noobj + loss_cls
             
         coord_loss /= self.batch_size
         obj_loss /= self.batch_size
@@ -205,7 +232,6 @@ if __name__ == "__main__":
     dataloaders, classname_list = build_dataloader(data_path=data_path, image_size=(input_size, input_size), batch_size=batch_size)
     model = YOLOv3_Model(config_path=config_path, num_classes=len(classname_list), device=device, pretrained=True)
     model = model.to(device)
-
     criterion = YOLOv3_Loss(config_path=config_path, model=model)
 
     # sanity check

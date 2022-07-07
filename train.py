@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from collections import defaultdict
 
 import yaml
@@ -15,35 +16,41 @@ from utils import save_model, build_progress_bar, build_logger
 class Trainer():
     def __init__(self, data_path, config_path, save_path):
         self.save_path = save_path
+        self.time_created = datetime.today().strftime('%Y-%m-%d_%H-%M')
         os.makedirs(self.save_path, exist_ok=True)
 
         with open(config_path) as f:
             item = yaml.load(f, Loader=yaml.FullLoader)
         
-        self.log_level = item['LOG_LEVEL']
         self.is_cuda = item['IS_CUDA']
+        self.check_bpr = item['CHECK_BPR']
+        self.log_level = item['LOG_LEVEL']
         self.num_epochs = item['NUM_EPOCHS']
         self.input_size = item['INPUT_SIZE']
         self.batch_size = item['BATCH_SIZE']
         self.lr = item['LEARNING_RATE']
         self.weight_decay = item['WEIGHT_DECAY']
 
+        self.logger = build_logger(log_path=self.save_path / 'logs', set_level=self.log_level)
         self.device = torch.device('cuda' if torch.cuda.is_available() and self.is_cuda else 'cpu')
         self.dataloaders, self.classname_list = build_dataloader(data_path=data_path, 
                                                                 image_size=(self.input_size, self.input_size), 
                                                                 batch_size=self.batch_size)
         self.num_classes = len(self.classname_list)
-
-        self.model = YOLOv3_Model(config_path=config_path, 
-                                  num_classes=self.num_classes, 
-                                  device=self.device, 
-                                  pretrained=True)
+        self.model = YOLOv3_Model(config_path=config_path, num_classes=self.num_classes, device=self.device)
         self.model = self.model.to(self.device)
 
         self.criterion = YOLOv3_Loss(config_path=config_path, model=self.model)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        
+        message = f'Input Size: {self.input_size}, '
+        if self.check_bpr:
+            train_dataloder = tqdm(self.dataloaders['train'], desc='Calculating Best Possible Rate(BPR)...', ncols=200)
+            BPR, total_num_anchor, total_num_target = self.criterion.check_best_possible_recall(train_dataloder)
+            message += f'Best Possible Rate: {BPR}, Anchor/Target: {total_num_anchor}/{total_num_target}'
+            del train_dataloder
 
-        self.logger = build_logger(log_path=self.save_path / 'logs', set_level=self.log_level)
+        self.logger.info(message)
         
         
     def train_one_epoch(self):
@@ -80,7 +87,7 @@ class Trainer():
             for loss_name in loss_per_phase.keys():
                 if loss_name.startswith(phase):
                     loss_per_phase[loss_name] /= len(dataloader_pbars[phase])
-
+                    
             del mini_batch, losses
             torch.cuda.empty_cache()
         return loss_per_phase
@@ -95,15 +102,13 @@ class Trainer():
             global_pbar.set_description(desc=message)
             loss_per_phase = self.train_one_epoch()
 
-            train_loss = loss_per_phase["train_total"]
-            val_loss = loss_per_phase["val_total"]
-            monitor_text = f' Loss - Train: {train_loss:.2f}, Val: {val_loss:.2f}'
-            self.logger.info(message + monitor_text)
+            monitor_text = f' Loss - Train: {loss_per_phase["train_total"]:.2f}, Val: {loss_per_phase["val_total"]:.2f}'
+            self.logger.debug(message + monitor_text)
             
             if (self.epoch+1) % 10 == 0:
                 save_model(model=self.model, 
                            save_path=self.save_path / 'weights',
-                           model_name=f'{self.epoch+1:02d}.pth')
+                           model_name=f'{self.time_created}-{self.epoch+1:02d}.pth')
         global_pbar.close()
 
 
@@ -114,11 +119,10 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[0]
 
-    EXP_NAME = 'test06'
+    EXP_NAME = 'test01'
     data_path = ROOT / 'data' / 'coco128.yml'
     config_path = ROOT / 'config' / 'yolov3.yml'
     save_path = ROOT / 'experiments' / EXP_NAME
 
     trainer = Trainer(data_path=data_path, config_path=config_path, save_path=save_path)
     trainer.run()
-

@@ -20,7 +20,6 @@ from utils import CacheMaker
 
 class Dataset():
     def __init__(self, data_path, phase, transformer=None):
-
         with open(data_path) as f:
             data_item = yaml.load(f, Loader=yaml.FullLoader)
         
@@ -34,14 +33,14 @@ class Dataset():
             self.image_paths += [str(image_dir / fn) for fn in os.listdir(image_dir) \
                                  if fn.lower().endswith(('.png','.jpg','.jpeg'))]
         self.label_paths = self.replace_image2label_paths(self.image_paths)
-        
+        self.generate_no_label(self.label_paths)
+
         cache_dir = Path(data_path).parent / 'caches'
         cache_name = Path(data_path).name.split('.')[0]
         cache_maker = CacheMaker(cache_dir, cache_name, phase)
-        
         cache = cache_maker(self.image_paths, self.label_paths)
-        self.image_paths = list(cache.keys())
-        self.label_paths = self.replace_image2label_paths(self.image_paths)
+
+        assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files" 
         
         self.transformer = transformer
 
@@ -51,14 +50,14 @@ class Dataset():
     
     def __getitem__(self, index):
         filename, image = self.get_image(index)
-        class_ids, bboxes, noobj_status = self.get_label(index)
+        class_ids, bboxes = self.get_label(index)
         bboxes = self.clip_box_coordinates(bboxes)
         
         if self.transformer:
             transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             image = transformed_data['image']
             bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)
-            class_ids = np.array(transformed_data['class_ids'])
+            class_ids = np.array(transformed_data['class_ids'], dtype=np.float32)
 
             if len(class_ids) == 0:
                 class_ids = np.array([-1])
@@ -85,20 +84,25 @@ class Dataset():
             item = [x.split() for x in f.read().splitlines()]
             label = np.array(item, dtype=np.float32)
         
-        class_ids, bboxes, noobj_status = self.check_no_label(label)
-        return class_ids, bboxes, noobj_status
+        class_ids, bboxes = self.check_no_label(label)
+        return class_ids, bboxes
     
-    
+        
+    def generate_no_label(self, label_paths):
+        for label_path in label_paths:
+            if not os.path.isfile(label_path):
+                f = open(str(label_path), mode='w')
+                f.close()
+
+
     def check_no_label(self, label):
         if len(label) == 0:
             class_ids = np.array([-1])
             bboxes = np.array([[0.5, 0.5, 1., 1.]], dtype=np.float32)
-            noobj_status = True
         else:
             class_ids = label[:, 0]
             bboxes = label[:, 1:5]
-            noobj_status = False
-        return class_ids, bboxes, noobj_status
+        return class_ids, bboxes
     
 
     def clip_box_coordinates(self, bboxes):
@@ -121,6 +125,7 @@ class Dataset():
         xcycwh = np.concatenate((xcyc, wh), axis=1)
         return xcycwh
 
+
     @staticmethod
     def collate_fn(mini_batch):
         images = []
@@ -133,6 +138,7 @@ class Dataset():
             filenames.append(filename)
         
         return torch.stack(images, dim=0), targets, filenames
+
 
 
 def build_dataloader(data_path, image_size=(448, 448), batch_size=4):
