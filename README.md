@@ -15,7 +15,7 @@ This is repository for source codes to train various detection models.
 
 | Date | Content |
 |:----:|:-----|
-| 07-07 | fix:yolov3 loss function(valid) |
+| 07-07 | fix:valid loss function, valid loss for running with no object |
 | 07-05 | fix:yolov3 loss function |
 | 07-04 | First commit |
 
