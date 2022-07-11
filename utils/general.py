@@ -21,11 +21,11 @@ def build_progress_bar(dataloaders):
 
 
 def get_IoU_target_with_anchor(wh1, wh2):
-        w1, h1 = wh1
-        w2, h2 = wh2
-        inter_area = torch.min(w1, w2) * torch.min(h1, h2)
-        union_area = (w1 * h1) + (w2 * h2) - inter_area
-        return inter_area / union_area
+    w1, h1 = wh1
+    w2, h2 = wh2
+    inter_area = torch.min(w1, w2) * torch.min(h1, h2)
+    union_area = (w1 * h1) + (w2 * h2) - inter_area
+    return inter_area / union_area
 
 
 def check_best_possible_recall(dataloader, PBR_params, anchor_iou_threshold=0.25):
