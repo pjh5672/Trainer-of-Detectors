@@ -9,7 +9,7 @@ from tqdm import tqdm
 from dataloader import build_dataloader
 from models import YOLOv3_Model
 from loss_function import YOLOv3_Loss
-from utils import save_model, build_progress_bar, build_logger
+from utils import *
 
 
 
@@ -23,8 +23,8 @@ class Trainer():
             item = yaml.load(f, Loader=yaml.FullLoader)
         
         self.is_cuda = item['IS_CUDA']
-        self.check_bpr = item['CHECK_BPR']
         self.log_level = item['LOG_LEVEL']
+        self.anchor_iou_threshold = item['ANCHOR_IOU_THRESHOLD']
         self.num_epochs = item['NUM_EPOCHS']
         self.input_size = item['INPUT_SIZE']
         self.batch_size = item['BATCH_SIZE']
@@ -43,16 +43,21 @@ class Trainer():
         self.criterion = YOLOv3_Loss(config_path=config_path, model=self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         
-        message = f'Input Size: {self.input_size}, '
-        if self.check_bpr:
-            train_dataloder = tqdm(self.dataloaders['train'], desc='Calculating Best Possible Rate(BPR)...', ncols=200)
-            BPR, total_num_anchor, total_num_target = self.criterion.check_best_possible_recall(train_dataloder)
-            message += f'Best Possible Rate: {BPR}, Anchor/Target: {total_num_anchor}/{total_num_target}'
-            del train_dataloder
-
+        dataloader = tqdm(self.dataloaders['train'], desc='Calculating Best Possible Rate(BPR)...', ncols=200)
+        PBR_params = [
+            self.input_size, self.batch_size, 
+            self.criterion.num_anchor_per_scale, 
+            self.criterion.anchors, 
+            self.criterion.strides
+        ]
+        message = f'Input Size: {self.input_size}'
+        BPR_rate, total_n_anchor, total_n_target = check_best_possible_recall(dataloader, PBR_params, 
+                                                                              self.anchor_iou_threshold)
+        message += f', Best Possible Rate: {BPR_rate:0.5f}, Total_anchor/Total_target: {total_n_anchor}/{total_n_target}'
         self.logger.info(message)
+        del dataloader
         
-        
+
     def train_one_epoch(self):
         dataloader_pbars = build_progress_bar(self.dataloaders)
         loss_per_phase = defaultdict(float)
@@ -65,7 +70,7 @@ class Trainer():
                 self.model.eval()
             
             for index, mini_batch in enumerate(dataloader_pbars[phase]):
-                images = mini_batch[0].to(self.device)
+                images = mini_batch[0].to(self.device, non_blocking=True)
                 targets = mini_batch[1]
                 filenames = mini_batch[2]
             
@@ -119,7 +124,7 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[0]
 
-    EXP_NAME = 'test01'
+    EXP_NAME = 'test'
     data_path = ROOT / 'data' / 'coco128.yml'
     config_path = ROOT / 'config' / 'yolov3.yml'
     save_path = ROOT / 'experiments' / EXP_NAME

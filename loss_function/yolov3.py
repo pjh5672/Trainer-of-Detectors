@@ -1,7 +1,18 @@
+import os
+import sys
+from pathlib import Path
+
 import yaml
 import numpy as np
 import torch
 import torch.nn as nn
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
+from utils import get_IoU_target_with_anchor
 
 
 
@@ -30,31 +41,6 @@ class YOLOv3_Loss():
         self.mae_loss = nn.L1Loss(reduction='sum')
         self.bce_loss = nn.BCELoss(reduction='sum')
 
-
-    def check_best_possible_recall(self, train_dataloader):
-        total_num_target = 0
-        total_num_assigned_anchor = 0
-
-        for index, mini_batch in enumerate(train_dataloader):
-            targets = mini_batch[1]
-            num_assigned_anchor = 0
-            for scale_index in range(self.num_anchors):
-                anchor_each_scale = self.anchors[scale_index]
-                stride_each_scale = self.strides[scale_index]
-                dummy_y_each_scale = self.dummy_y[scale_index]
-                self.batch_size, num_preds, _ = dummy_y_each_scale.shape
-                self.grid_size = int(np.sqrt(num_preds/self.num_anchor_per_scale))
-                
-                b_obj_mask, _, _, _, _, _, _ = self.transform_batch_target_loss_form(targets, anchor_each_scale)
-                
-                num_assigned_anchor += b_obj_mask.sum().item()
-            total_num_target += len(np.concatenate(targets, axis=0))
-            total_num_assigned_anchor += (num_assigned_anchor / self.num_anchors)
-        total_num_assigned_anchor = int(total_num_assigned_anchor)
-        best_possible_recall = round(total_num_assigned_anchor / total_num_target, 4)
-        del self.dummy_y
-        torch.cuda.empty_cache()
-        return best_possible_recall, total_num_assigned_anchor, total_num_target
 
 
     def __call__(self, predictions, targets):
@@ -131,7 +117,7 @@ class YOLOv3_Loss():
                                device=self.device, dtype=torch.uint8)
         noobj_mask = torch.ones(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
                                 device=self.device, dtype=torch.uint8)
-        iou_target_with_anchor = [self.get_IoU_target_with_anchor(target_wh.t(), anchor) for anchor in anchor_each_scale]
+        iou_target_with_anchor = [get_IoU_target_with_anchor(target_wh.t(), anchor) for anchor in anchor_each_scale]
         iou_target_with_anchor = torch.stack(iou_target_with_anchor, dim=0)
         best_iou, best_anchor_index = iou_target_with_anchor.max(dim=0)
 
