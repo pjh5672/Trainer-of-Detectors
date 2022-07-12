@@ -29,7 +29,7 @@ def get_IoU_target_with_anchor(wh1, wh2):
 
 
 def check_best_possible_recall(dataloader, PBR_params, anchor_iou_threshold=0.25):
-    input_size, batch_size, num_anchor_per_scale, anchors, strides = PBR_params
+    input_size, num_anchor_per_scale, anchors, strides = PBR_params
     anchors = [anchor.cpu() for anchor in anchors]
     total_n_target, total_n_anchor = 0, 0
 

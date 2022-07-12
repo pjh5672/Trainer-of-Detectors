@@ -45,14 +45,13 @@ class Trainer():
         
         dataloader = tqdm(self.dataloaders['train'], desc='Calculating Best Possible Rate(BPR)...', ncols=200)
         PBR_params = [
-            self.input_size, self.batch_size, 
+            self.input_size,
             self.criterion.num_anchor_per_scale, 
             self.criterion.anchors, 
             self.criterion.strides
         ]
         message = f'Input Size: {self.input_size}'
-        BPR_rate, total_n_anchor, total_n_target = check_best_possible_recall(dataloader, PBR_params, 
-                                                                              self.anchor_iou_threshold)
+        BPR_rate, total_n_anchor, total_n_target = check_best_possible_recall(dataloader, PBR_params, self.anchor_iou_threshold)
         message += f', Best Possible Rate: {BPR_rate:0.5f}, Total_anchor/Total_target: {total_n_anchor}/{total_n_target}'
         self.logger.info(message)
         del dataloader
