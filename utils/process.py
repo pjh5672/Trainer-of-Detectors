@@ -20,30 +20,34 @@ def filter_obj_score(prediction, conf_threshold=0.01):
 
 
 def run_NMS_for_yolo(prediction, iou_threshold=0.1):
-    bboxes = prediction[:, 1:5]
+    bboxes = prediction[:, 1:5] * 100
+    scores = prediction[:, 5]
+
     if len(bboxes) == 0:
         return []
     if bboxes.dtype.kind == "i":
         bboxes = bboxes.astype("float")
         
-    pick = []
     x1 = bboxes[:, 0] - bboxes[:, 2]/2
     y1 = bboxes[:, 1] - bboxes[:, 3]/2
     x2 = bboxes[:, 0] + bboxes[:, 2]/2
     y2 = bboxes[:, 1] + bboxes[:, 3]/2
-    area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(y2)
-    
-    while len(idxs) > 0:
-        last = len(idxs) - 1
-        i = idxs[last]
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+    order = scores.argsort()[::-1]
+
+    pick = []
+    while len(order) > 0:
+        i = order[0]
         pick.append(i)
-        xx1 = np.maximum(x1[i], x1[idxs[:last]])
-        yy1 = np.maximum(y1[i], y1[idxs[:last]])
-        xx2 = np.minimum(x2[i], x2[idxs[:last]])
-        yy2 = np.minimum(y2[i], y2[idxs[:last]])
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+        
         w = np.maximum(0, xx2 - xx1 + 1)
         h = np.maximum(0, yy2 - yy1 + 1)
-        overlap = (w * h) / area[idxs[:last]]
-        idxs = np.delete(idxs, np.concatenate(([last], np.where(overlap > iou_threshold)[0])))
+        inter = w * h
+        overlap = inter / (areas[i] + areas[order[1:]] - inter)
+        idxs = np.where(overlap <= iou_threshold)[0]
+        order = order[idxs + 1]
     return prediction[pick]

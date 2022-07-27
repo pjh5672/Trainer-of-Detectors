@@ -1,5 +1,4 @@
 import random
-
 import cv2
 
 TEXT_COLOR = (255, 255, 255)
@@ -18,11 +17,7 @@ def generate_random_color(num_colors):
 def visualize_bbox(image, label, class_list, color_list, 
                    show_class=False, show_score=False, fontscale=0.7, thickness=2):
     class_id = int(label[0])
-    x_center, y_center, w, h = label[1:5]
-    x_min = int(x_center - w/2)
-    y_min = int(y_center - h/2)
-    x_max = int(x_center + w/2)
-    y_max = int(y_center + h/2)
+    x_min, y_min, x_max, y_max = list(map(int, label[1:5]))
     color = color_list[class_id]
     cv2.rectangle(image, (x_min, y_min), (x_max, y_max), color=color, thickness=thickness)
 

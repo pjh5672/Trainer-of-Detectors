@@ -104,14 +104,6 @@ class YOLOv3_Loss():
         return tx, ty, tw, th
 
 
-    def get_IoU_target_with_anchor(self, wh1, wh2):
-        w1, h1 = wh1
-        w2, h2 = wh2
-        inter_area = torch.min(w1, w2) * torch.min(h1, h2)
-        union_area = (w1 * h1) + (w2 * h2) - inter_area
-        return inter_area / union_area
-
-
     def build_target_mask(self, grid_ij, target_xy, target_wh, anchor_each_scale):
         obj_mask = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
                                device=self.device, dtype=torch.uint8)

@@ -15,6 +15,7 @@ This is repository for source codes to train various detection models.
 
 | Date | Content |
 |:----:|:-----|
+| 07-28 | add:mAP evaluation function implementation |
 | 07-12 | add:COCO evaluation API test env initial build |
 | 07-11 | add:Best Possible Recalls(BPR) implementation |
 | 07-07 | fix:valid loss function, valid loss for running with no object |

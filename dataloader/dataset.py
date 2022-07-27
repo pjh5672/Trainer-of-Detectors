@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -7,6 +8,7 @@ import yaml
 import cv2
 import numpy as np
 import torch
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 FILE = Path(__file__).resolve()
@@ -15,7 +17,8 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 from transform import build_transformer
-from utils import CacheMaker
+from utils import CacheMaker, box_transform_xcycwh_to_x1y1x2y2, box_transform_x1y1x2y2_to_xcycwh
+
 
 
 class Dataset():
@@ -31,15 +34,18 @@ class Dataset():
         for sub_dir in data_item[self.phase.upper()]:
             image_dir = self.data_dir / sub_dir
             self.image_paths += [str(image_dir / fn) for fn in os.listdir(image_dir) \
-                                 if fn.lower().endswith(('.png','.jpg','.jpeg'))]
+                                 if fn.lower().endswith(('png','jpg','jpeg'))]
         self.label_paths = self.replace_image2label_paths(self.image_paths)
         self.generate_no_label(self.label_paths)
 
+        GT_dir = Path(data_path).parent / 'evals'
         cache_dir = Path(data_path).parent / 'caches'
-        cache_name = Path(data_path).name.split('.')[0]
-        cache_maker = CacheMaker(cache_dir, cache_name, phase)
+        save_name = Path(data_path).name.split('.')[0]
+        
+        if phase == 'val':
+            self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase)
+        cache_maker = CacheMaker(cache_dir=cache_dir, file_name=save_name, phase=phase)
         cache = cache_maker(self.image_paths, self.label_paths)
-
         assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files" 
         
         self.transformer = transformer
@@ -51,8 +57,7 @@ class Dataset():
     def __getitem__(self, index):
         filename, image = self.get_image(index)
         class_ids, bboxes = self.get_label(index)
-        bboxes = self.clip_box_coordinates(bboxes)
-        
+         
         if self.transformer:
             transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             image = transformed_data['image']
@@ -85,6 +90,7 @@ class Dataset():
             label = np.array(item, dtype=np.float32)
         
         class_ids, bboxes = self.check_no_label(label)
+        bboxes = self.clip_box_coordinates(bboxes)
         return class_ids, bboxes
     
         
@@ -106,24 +112,60 @@ class Dataset():
     
 
     def clip_box_coordinates(self, bboxes):
-        bboxes = self.box_transform_xcycwh_to_x1y1x2y2(bboxes)
-        bboxes = self.box_transform_x1y1x2y2_to_xcycwh(bboxes)
+        bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
+        bboxes = box_transform_x1y1x2y2_to_xcycwh(bboxes)
         return bboxes
-    
 
-    def box_transform_xcycwh_to_x1y1x2y2(self, bboxes):
-        x1y1 = bboxes[:, :2] - bboxes[:, 2:] / 2
-        x2y2 = bboxes[:, :2] + bboxes[:, 2:] / 2
-        x1y1x2y2 = np.concatenate((x1y1, x2y2), axis=1)
-        x1y1x2y2 = x1y1x2y2.clip(min=0., max=1.)
-        return x1y1x2y2
-    
 
-    def box_transform_x1y1x2y2_to_xcycwh(self, bboxes):
-        wh = bboxes[:, 2:] - bboxes[:, :2]
-        xcyc = bboxes[:, :2] + wh / 2
-        xcycwh = np.concatenate((xcyc, wh), axis=1)
-        return xcycwh
+    def generate_GT_for_mAP(self, save_dir, file_name, phase):
+        if not save_dir.is_dir():
+            os.makedirs(save_dir, exist_ok=True)
+        save_path = save_dir / f'{file_name}_{phase}.json'
+
+        if not save_path.is_file():
+            eval_data = {}
+            eval_data['images'] = []
+            eval_data['annotations'] = []
+            eval_data['categories'] = {}
+            eval_data['timestamp'] = datetime.today().strftime('%Y-%m-%d_%H:%M')
+            
+            pbar = tqdm(range(len(self.label_paths)), ncols=200)
+            img_id = 0
+            anno_id = 0
+            for index in pbar:
+                pbar.set_description(f'Generating GT file for mAP evaluation...')
+                filename, image = self.get_image(index)
+                class_ids, bboxes = self.get_label(index)
+                bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
+
+                height, width, _ = image.shape
+                anno_bboxes = bboxes.copy()
+                anno_bboxes[:, [0,2]] *= width
+                anno_bboxes[:, [1,3]] *= height
+
+                for class_id, anno_bbox in zip(class_ids, anno_bboxes):
+                    lbl_dict = {}
+                    lbl_dict['id'] = anno_id
+                    lbl_dict['image_id'] = img_id
+                    lbl_dict['bbox'] = [round(pt, 2) for pt in list(map(float, anno_bbox))]
+                    lbl_dict['area'] = round(float((anno_bbox[2]-anno_bbox[0])*(anno_bbox[3]-anno_bbox[1])),2)
+                    lbl_dict['class_id'] = int(class_id)
+                    eval_data['annotations'].append(lbl_dict)
+                    anno_id += 1
+                
+                img_dict = {}
+                img_dict['id'] = img_id
+                img_dict['filename'] = filename
+                img_dict['height'] = height
+                img_dict['width'] = width
+                eval_data['images'].append(img_dict)
+                img_id += 1
+
+            for idx in range(len(self.classname_list)):
+                eval_data['categories'][idx] = self.classname_list[idx]
+
+            with open(save_path, 'w') as outfile:
+                json.dump(eval_data, outfile)     
 
 
     @staticmethod
@@ -146,7 +188,7 @@ def build_dataloader(data_path, image_size=(448, 448), batch_size=4):
     
     dataloaders = {}
     dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
-    dataloaders['train'] = DataLoader(dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, shuffle=False, pin_memory=True)
+    dataloaders['train'] = DataLoader(dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, shuffle=True, pin_memory=True)
 
     dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
     dataloaders['val'] = DataLoader(dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, shuffle=False, pin_memory=True)
@@ -155,8 +197,6 @@ def build_dataloader(data_path, image_size=(448, 448), batch_size=4):
 
 
 if __name__ == '__main__':
-    from pathlib import Path
-
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
 

@@ -20,6 +20,27 @@ def build_progress_bar(dataloaders):
     return progress_bar
 
 
+def scale_to_original(bboxes, scale_w, scale_h):
+    bboxes[:,[0,2]] *= scale_w
+    bboxes[:,[1,3]] *= scale_h
+    return bboxes.round(2)
+
+
+def box_transform_xcycwh_to_x1y1x2y2(bboxes):
+    x1y1 = bboxes[:, :2] - bboxes[:, 2:] / 2
+    x2y2 = bboxes[:, :2] + bboxes[:, 2:] / 2
+    x1y1x2y2 = np.concatenate((x1y1, x2y2), axis=1)
+    x1y1x2y2 = x1y1x2y2.clip(min=0., max=1.)
+    return x1y1x2y2
+
+
+def box_transform_x1y1x2y2_to_xcycwh(bboxes):
+    wh = bboxes[:, 2:] - bboxes[:, :2]
+    xcyc = bboxes[:, :2] + wh / 2
+    xcycwh = np.concatenate((xcyc, wh), axis=1)
+    return xcycwh
+
+
 def get_IoU_target_with_anchor(wh1, wh2):
     w1, h1 = wh1
     w2, h2 = wh2

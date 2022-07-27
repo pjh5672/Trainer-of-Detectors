@@ -8,11 +8,11 @@ from tqdm import tqdm
 
 
 class CacheMaker():
-    def __init__(self, cache_dir, cache_name, phase):
+    def __init__(self, cache_dir, file_name, phase):
         if not cache_dir.is_dir():
             os.makedirs(cache_dir, exist_ok=True)
         self.phase = phase
-        self.cache_path = cache_dir / f'{cache_name}_{self.phase}.cache'
+        self.cache_path = cache_dir / f'{file_name}_{self.phase}.cache'
     
     
     def __call__(self, image_paths, label_paths):
