@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from collections import defaultdict
 
+import cv2
 import yaml
 import torch
 from tqdm import tqdm
@@ -19,30 +20,42 @@ class Trainer():
         self.time_created = datetime.today().strftime('%Y-%m-%d_%H-%M')
         os.makedirs(self.save_path, exist_ok=True)
 
+        with open(data_path) as f:
+            data_item = yaml.load(f, Loader=yaml.FullLoader)
+
         with open(config_path) as f:
-            item = yaml.load(f, Loader=yaml.FullLoader)
+            config_item = yaml.load(f, Loader=yaml.FullLoader)
         
-        self.is_cuda = item['IS_CUDA']
-        self.log_level = item['LOG_LEVEL']
-        self.anchor_iou_threshold = item['ANCHOR_IOU_THRESHOLD']
-        self.num_epochs = item['NUM_EPOCHS']
-        self.input_size = item['INPUT_SIZE']
-        self.batch_size = item['BATCH_SIZE']
-        self.lr = item['LEARNING_RATE']
-        self.weight_decay = item['WEIGHT_DECAY']
+        self.is_cuda = config_item['IS_CUDA']
+        self.log_level = config_item['LOG_LEVEL']
+        self.anchor_iou_threshold = config_item['ANCHOR_IOU_THRESHOLD']
+        self.num_epochs = config_item['NUM_EPOCHS']
+        self.input_size = config_item['INPUT_SIZE']
+        self.batch_size = config_item['BATCH_SIZE']
+        self.lr = config_item['LEARNING_RATE']
+        self.weight_decay = config_item['WEIGHT_DECAY']
+
+        self.img_log_dir = self.save_path / 'images'
+        os.makedirs(self.img_log_dir, exist_ok=True)
 
         self.logger = build_logger(log_path=self.save_path / 'logs', set_level=self.log_level)
         self.device = torch.device('cuda' if torch.cuda.is_available() and self.is_cuda else 'cpu')
         self.dataloaders, self.classname_list = build_dataloader(data_path=data_path, 
                                                                 image_size=(self.input_size, self.input_size), 
                                                                 batch_size=self.batch_size)
+        self.val_file = data_path.parent / data_item['mAP_FILE']
+        assert self.val_file.is_file(), RuntimeError(f'Not exist val file, expected {self.val_file}')
+
         self.num_classes = len(self.classname_list)
         self.model = YOLOv3_Model(config_path=config_path, num_classes=self.num_classes, device=self.device)
         self.model = self.model.to(self.device)
 
         self.criterion = YOLOv3_Loss(config_path=config_path, model=self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-        
+
+        self.evaluator = Evaluator(GT_file=self.val_file)
+        self.color_list = generate_random_color(num_colors=self.num_classes)
+
         dataloader = tqdm(self.dataloaders['train'], desc='Calculating Best Possible Rate(BPR)...', ncols=200)
         PBR_params = [
             self.input_size,
@@ -61,6 +74,7 @@ class Trainer():
         dataloader_pbars = build_progress_bar(self.dataloaders)
         loss_per_phase = defaultdict(float)
         loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
+        detections = []
 
         for phase in ['train', 'val']:
             if phase == 'train':
@@ -69,10 +83,13 @@ class Trainer():
                 self.model.eval()
             
             for index, mini_batch in enumerate(dataloader_pbars[phase]):
+                if index == 0:
+                    canvas = mini_batch[0][0]
+
                 images = mini_batch[0].to(self.device, non_blocking=True)
                 targets = mini_batch[1]
                 filenames = mini_batch[2]
-            
+                
                 with torch.set_grad_enabled(phase == 'train'):
                     predictions = self.model(images)
                 losses = self.criterion(predictions, targets)
@@ -81,6 +98,14 @@ class Trainer():
                     self.optimizer.zero_grad()
                     losses[0].backward()
                     self.optimizer.step()
+                    
+                elif phase == 'val':
+                    for idx in range(1):
+                        filename = filenames[idx]
+                        pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
+                        pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=0.01)
+                        pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=0.5)
+                        detections.append((filename, pred_yolo))
 
                 monitor_text = ''
                 for loss_name, loss_value in zip(loss_types, losses):
@@ -91,28 +116,49 @@ class Trainer():
             for loss_name in loss_per_phase.keys():
                 if loss_name.startswith(phase):
                     loss_per_phase[loss_name] /= len(dataloader_pbars[phase])
-                    
+
+            if phase == 'val':
+                show_conf_threshold = 0.1
+                filename, pred_yolo = detections[0]
+                img_h = self.evaluator.image_to_info[filename]['height']
+                img_w = self.evaluator.image_to_info[filename]['width']
+                canvas = denormalize(canvas)
+                canvas = cv2.resize(canvas, dsize=(img_w, img_h))
+                pred_voc = pred_yolo.copy()
+                pred_voc = pred_voc[pred_voc[:, -1] > show_conf_threshold]
+                pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
+                pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=img_w, scale_h=img_h)
+                canvas = visualize(canvas, pred_voc, self.classname_list, self.color_list, show_class=True, show_score=True)
+
+                mAP_info, eval_text = self.evaluator(detections)
+
             del mini_batch, losses
             torch.cuda.empty_cache()
-        return loss_per_phase
+
+        return loss_per_phase, mAP_info, eval_text, canvas
 
 
     def run(self):
-        best_score = float('inf')
+        best_mAP = 0.01
         global_pbar = tqdm(range(self.num_epochs), ncols=200)
         
-        for self.epoch in global_pbar:
-            message = f'[Epoch:{self.epoch+1:02d}/{self.num_epochs}]'
+        for epoch in global_pbar:
+            message = f'[Epoch:{epoch+1:02d}/{self.num_epochs}]'
             global_pbar.set_description(desc=message)
-            loss_per_phase = self.train_one_epoch()
+            loss_per_phase, mAP_info, eval_text, canvas = self.train_one_epoch()
 
             monitor_text = f' Loss - Train: {loss_per_phase["train_total"]:.2f}, Val: {loss_per_phase["val_total"]:.2f}'
             self.logger.debug(message + monitor_text)
-            
-            if (self.epoch+1) % 10 == 0:
+            self.logger.info(eval_text)
+
+            if (epoch+1) % 2 == 0:
+                imwrite(str(self.img_log_dir.resolve() / f'{self.time_created}-EP{epoch+1:02d}.jpg'), canvas)
+
+            if mAP_info['all']['mAP05'] > best_mAP:
+                best_mAP = mAP_info['all']['mAP05']
                 save_model(model=self.model, 
                            save_path=self.save_path / 'weights',
-                           model_name=f'{self.time_created}-{self.epoch+1:02d}.pth')
+                           model_name=f'{self.time_created}-EP{epoch+1:02d}.pth')
         global_pbar.close()
 
 
@@ -123,7 +169,7 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[0]
 
-    EXP_NAME = 'test'
+    EXP_NAME = 'test05'
     data_path = ROOT / 'data' / 'coco128.yml'
     config_path = ROOT / 'config' / 'yolov3.yml'
     save_path = ROOT / 'experiments' / EXP_NAME

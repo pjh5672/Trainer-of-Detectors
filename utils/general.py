@@ -1,4 +1,5 @@
 import os
+import cv2
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -92,3 +93,19 @@ def check_best_possible_recall(dataloader, PBR_params, anchor_iou_threshold=0.25
     
     BPR_rate = total_n_anchor/total_n_target
     return BPR_rate, total_n_anchor, total_n_target
+
+
+def imwrite(filename, img, params=None):
+    try:
+        ext = os.path.splitext(filename)[1]
+        result, n = cv2.imencode(ext, img, params)
+
+        if result:
+            with open(filename, mode='w+b') as f:
+                n.tofile(f)
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(e)
+        return False

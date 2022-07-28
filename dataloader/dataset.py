@@ -44,6 +44,7 @@ class Dataset():
         
         if phase == 'val':
             self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase)
+            
         cache_maker = CacheMaker(cache_dir=cache_dir, file_name=save_name, phase=phase)
         cache = cache_maker(self.image_paths, self.label_paths)
         assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files" 
@@ -191,7 +192,7 @@ def build_dataloader(data_path, image_size=(448, 448), batch_size=4):
     dataloaders['train'] = DataLoader(dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, shuffle=True, pin_memory=True)
 
     dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
-    dataloaders['val'] = DataLoader(dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, shuffle=False, pin_memory=True)
+    dataloaders['val'] = DataLoader(dset, batch_size=1, collate_fn=Dataset.collate_fn, shuffle=False, pin_memory=True)
     return dataloaders, dset.classname_list
 
 
