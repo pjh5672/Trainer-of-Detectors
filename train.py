@@ -169,7 +169,7 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[0]
 
-    EXP_NAME = 'test13'
+    EXP_NAME = 'test16'
     data_path = ROOT / 'data' / 'coco128.yml'
     config_path = ROOT / 'config' / 'yolov3.yml'
     save_path = ROOT / 'experiments' / EXP_NAME

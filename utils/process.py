@@ -25,8 +25,8 @@ def run_NMS_for_yolo(prediction, iou_threshold=0.1):
     if bboxes.dtype.kind == "i":
         bboxes = bboxes.astype("float")
         
-    x1 = bboxes[:, 0] - bboxes[:, 2]/2
-    y1 = bboxes[:, 1] - bboxes[:, 3]/2
+    x1 = np.maximum(bboxes[:, 0] - bboxes[:, 2]/2, 0)
+    y1 = np.maximum(bboxes[:, 1] - bboxes[:, 3]/2, 0)
     x2 = bboxes[:, 0] + bboxes[:, 2]/2
     y2 = bboxes[:, 1] + bboxes[:, 3]/2
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)
@@ -43,10 +43,9 @@ def run_NMS_for_yolo(prediction, iou_threshold=0.1):
         
         w = np.maximum(0, xx2 - xx1 + 1)
         h = np.maximum(0, yy2 - yy1 + 1)
-        inter = (w * h) + 1e-10
-        overlap = inter / (areas[i] + areas[order[1:]] - inter)
-        idxs = np.where(overlap <= iou_threshold)[0]
-        order = order[idxs + 1]
+        overlap = (w * h)
+        ious = overlap / (areas[0] + areas[order[1:]] - overlap + 1e-8)
+        order = order[np.where(ious <= iou_threshold)[0] + 1]
     return prediction[pick]
 
 
