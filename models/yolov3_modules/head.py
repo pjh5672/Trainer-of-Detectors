@@ -34,10 +34,6 @@ class DetectLayer(nn.Module):
 
         grid_xy = self.compute_grid_offset(grid_size)
         pred_bboxes = self.transform_pred_coords(bboxes=out[..., :4], grid_xy=grid_xy)
-
-        if not self.training:
-            pred_bboxes /= self.input_size
-
         pred_object = torch.sigmoid(out[..., 4])
         pred_class = torch.sigmoid(out[..., 5:])
 

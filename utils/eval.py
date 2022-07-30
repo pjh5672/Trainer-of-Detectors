@@ -7,7 +7,7 @@ from utils import box_transform_xcycwh_to_x1y1x2y2, scale_to_original
 
 
 class Evaluator():
-    def __init__(self, GT_file):
+    def __init__(self, GT_file, model_input_size):
         with open(GT_file, 'r') as ann_file:
             GT_data = json.load(ann_file)
 
@@ -23,7 +23,7 @@ class Evaluator():
         self.areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
         self.areaRngLbl = ['all', 'small', 'medium', 'large']
         self.iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
-        
+        self.input_size = model_input_size
         self.classes_index = list(map(int, GT_data['categories'].keys()))
         self.groundtruths = self.split_areaRng(GT_data['annotations'])
 
@@ -210,7 +210,7 @@ class Evaluator():
             img_w = self.image_to_info[filename]['width']
 
             pred_voc = pred_yolo.copy()
-            pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
+            pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5]/self.input_size)
             pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=img_w, scale_h=img_h)
 
             for item in pred_voc:

@@ -1,18 +1,14 @@
 import numpy as np
 
 
-def denormalize(input_tensor, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
-    tensor = input_tensor.clone()
-    for t, m, s in zip(tensor, mean, std):
-        t.mul_(s).add_(m)
-    tensor.clamp_(min=0, max=1.)
-    tensor *= 255.
-    image = tensor.permute(1,2,0).numpy().astype(np.uint8)
-    return image
+def scale_to_original(bboxes, scale_w, scale_h):
+    bboxes[:,[0,2]] *= scale_w
+    bboxes[:,[1,3]] *= scale_h
+    return bboxes.round(2)
 
 
 def filter_obj_score(prediction, conf_threshold=0.01):
-    valid_index = (prediction[..., 4] > conf_threshold)
+    valid_index = (prediction[:, 4] >= conf_threshold)
     bboxes = prediction[:, :4][valid_index]
     conf_scores = prediction[:, 4][valid_index]
     class_ids = np.argmax(prediction[:, 5:][valid_index], axis=1)
@@ -20,11 +16,12 @@ def filter_obj_score(prediction, conf_threshold=0.01):
 
 
 def run_NMS_for_yolo(prediction, iou_threshold=0.1):
-    bboxes = prediction[:, 1:5] * 100
+    bboxes = prediction[:, 1:5]
     scores = prediction[:, 5]
 
     if len(bboxes) == 0:
         return []
+        
     if bboxes.dtype.kind == "i":
         bboxes = bboxes.astype("float")
         
@@ -46,8 +43,10 @@ def run_NMS_for_yolo(prediction, iou_threshold=0.1):
         
         w = np.maximum(0, xx2 - xx1 + 1)
         h = np.maximum(0, yy2 - yy1 + 1)
-        inter = w * h
+        inter = (w * h) + 1e-10
         overlap = inter / (areas[i] + areas[order[1:]] - inter)
         idxs = np.where(overlap <= iou_threshold)[0]
         order = order[idxs + 1]
     return prediction[pick]
+
+

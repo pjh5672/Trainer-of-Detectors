@@ -188,12 +188,22 @@ def build_dataloader(data_path, image_size=(448, 448), batch_size=4):
     transformers = build_transformer(image_size=image_size)
     
     dataloaders = {}
-    dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
-    dataloaders['train'] = DataLoader(dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, shuffle=True, pin_memory=True)
+    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
+    dataloaders['train'] = DataLoader(train_dset, 
+                                    batch_size=batch_size, 
+                                    collate_fn=Dataset.collate_fn, 
+                                    shuffle=True, 
+                                    pin_memory=True, 
+                                    drop_last=True)
 
-    dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
-    dataloaders['val'] = DataLoader(dset, batch_size=1, collate_fn=Dataset.collate_fn, shuffle=False, pin_memory=True)
-    return dataloaders, dset.classname_list
+    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
+    dataloaders['val'] = DataLoader(val_dset, 
+                                    batch_size=batch_size, 
+                                    collate_fn=Dataset.collate_fn, 
+                                    shuffle=False, 
+                                    pin_memory=True,
+                                    drop_last=True)
+    return dataloaders, train_dset.classname_list
 
 
 

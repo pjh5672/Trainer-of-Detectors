@@ -1,4 +1,5 @@
 import yaml
+import torch
 import torch.nn as nn
 
 from yolov3_modules import Darknet53_backbone, YOLOv3_FPN, YOLOv3_head
@@ -12,14 +13,14 @@ class YOLOv3_Model(nn.Module):
         with open(config_path) as f:
             item = yaml.load(f, Loader=yaml.FullLoader)
 
-        input_size = item['INPUT_SIZE']
-        anchors = [x for x in item['ANCHORS'].values()]
+        self.input_size = item['INPUT_SIZE']
+        self.anchors = [x for x in item['ANCHORS'].values()]
         self.device = device
         self.backbone = Darknet53_backbone(pretrained=pretrained)
         self.fpn = YOLOv3_FPN()
-        self.head = YOLOv3_head(input_size=input_size, 
+        self.head = YOLOv3_head(input_size=self.input_size, 
                                 num_classes=num_classes, 
-                                anchors=anchors, 
+                                anchors=self.anchors, 
                                 device=self.device)
 
 
@@ -27,12 +28,12 @@ class YOLOv3_Model(nn.Module):
         features = self.backbone(x)
         features = self.fpn(features)
         predictions = self.head(features)
+
         return predictions
 
 
 if __name__ == "__main__":
     from pathlib import Path
-    import torch
 
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
@@ -46,10 +47,14 @@ if __name__ == "__main__":
                         device=device,
                         pretrained=True)
     model = model.to(device)
-
-    x = torch.randn(1, 3, 416, 416).to(device)
+    model.eval()
+    x = torch.randn(2, 3, 416, 416).to(device)
     with torch.no_grad():
         predictions = model(x)
 
     for prediction in predictions:
         print(prediction.shape)
+        
+    if not model.training:
+        print(predictions.shape)
+        print(predictions[..., :4])

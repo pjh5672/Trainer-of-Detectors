@@ -7,8 +7,8 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 from .general import *
+from .process import *
 from .eval import Evaluator
 from .log import build_logger
 from .cache import CacheMaker
-from .process import filter_obj_score, run_NMS_for_yolo, denormalize
-from .visualize import generate_random_color, visualize
+from .visualize import denormalize, generate_random_color, visualize

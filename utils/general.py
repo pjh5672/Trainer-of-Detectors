@@ -21,12 +21,6 @@ def build_progress_bar(dataloaders):
     return progress_bar
 
 
-def scale_to_original(bboxes, scale_w, scale_h):
-    bboxes[:,[0,2]] *= scale_w
-    bboxes[:,[1,3]] *= scale_h
-    return bboxes.round(2)
-
-
 def box_transform_xcycwh_to_x1y1x2y2(bboxes):
     x1y1 = bboxes[:, :2] - bboxes[:, 2:] / 2
     x2y2 = bboxes[:, :2] + bboxes[:, 2:] / 2

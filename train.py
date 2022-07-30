@@ -29,6 +29,8 @@ class Trainer():
         self.is_cuda = config_item['IS_CUDA']
         self.log_level = config_item['LOG_LEVEL']
         self.anchor_iou_threshold = config_item['ANCHOR_IOU_THRESHOLD']
+        self.min_conf_threshold = config_item['MIN_SCORE_THRESH']
+        self.min_iou_threshold = config_item['MIN_IOU_THRESH']
         self.num_epochs = config_item['NUM_EPOCHS']
         self.input_size = config_item['INPUT_SIZE']
         self.batch_size = config_item['BATCH_SIZE']
@@ -53,7 +55,7 @@ class Trainer():
         self.criterion = YOLOv3_Loss(config_path=config_path, model=self.model)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
-        self.evaluator = Evaluator(GT_file=self.val_file)
+        self.evaluator = Evaluator(GT_file=self.val_file, model_input_size=self.input_size)
         self.color_list = generate_random_color(num_colors=self.num_classes)
 
         dataloader = tqdm(self.dataloaders['train'], desc='Calculating Best Possible Rate(BPR)...', ncols=200)
@@ -98,14 +100,15 @@ class Trainer():
                     self.optimizer.zero_grad()
                     losses[0].backward()
                     self.optimizer.step()
-                    
+                
                 elif phase == 'val':
-                    for idx in range(1):
+                    for idx in range(self.batch_size):
                         filename = filenames[idx]
                         pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
-                        pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=0.01)
-                        pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=0.5)
-                        detections.append((filename, pred_yolo))
+                        pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=self.min_conf_threshold)
+                        pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=self.min_iou_threshold)
+                        if len(pred_yolo) > 0:
+                            detections.append((filename, pred_yolo))
 
                 monitor_text = ''
                 for loss_name, loss_value in zip(loss_types, losses):
@@ -118,18 +121,15 @@ class Trainer():
                     loss_per_phase[loss_name] /= len(dataloader_pbars[phase])
 
             if phase == 'val':
-                show_conf_threshold = 0.1
                 filename, pred_yolo = detections[0]
                 img_h = self.evaluator.image_to_info[filename]['height']
                 img_w = self.evaluator.image_to_info[filename]['width']
                 canvas = denormalize(canvas)
                 canvas = cv2.resize(canvas, dsize=(img_w, img_h))
                 pred_voc = pred_yolo.copy()
-                pred_voc = pred_voc[pred_voc[:, -1] > show_conf_threshold]
-                pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
+                pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5]/self.input_size)
                 pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=img_w, scale_h=img_h)
                 canvas = visualize(canvas, pred_voc, self.classname_list, self.color_list, show_class=True, show_score=True)
-
                 mAP_info, eval_text = self.evaluator(detections)
 
             del mini_batch, losses
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[0]
 
-    EXP_NAME = 'test05'
+    EXP_NAME = 'test13'
     data_path = ROOT / 'data' / 'coco128.yml'
     config_path = ROOT / 'config' / 'yolov3.yml'
     save_path = ROOT / 'experiments' / EXP_NAME
