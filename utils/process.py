@@ -1,12 +1,6 @@
 import numpy as np
 
 
-def scale_to_original(bboxes, scale_w, scale_h):
-    bboxes[:,[0,2]] *= scale_w
-    bboxes[:,[1,3]] *= scale_h
-    return bboxes.round(2)
-
-
 def filter_obj_score(prediction, conf_threshold=0.01):
     valid_index = (prediction[:, 4] >= conf_threshold)
     bboxes = prediction[:, :4][valid_index]
@@ -15,7 +9,7 @@ def filter_obj_score(prediction, conf_threshold=0.01):
     return np.concatenate([class_ids[:, np.newaxis], bboxes, conf_scores[:, np.newaxis]], axis=-1)
 
 
-def run_NMS_for_yolo(prediction, iou_threshold=0.1):
+def run_NMS_for_yolo(prediction, iou_threshold=0.5):
     bboxes = prediction[:, 1:5]
     scores = prediction[:, 5]
 
@@ -47,5 +41,3 @@ def run_NMS_for_yolo(prediction, iou_threshold=0.1):
         ious = overlap / (areas[0] + areas[order[1:]] - overlap + 1e-8)
         order = order[np.where(ious <= iou_threshold)[0] + 1]
     return prediction[pick]
-
-

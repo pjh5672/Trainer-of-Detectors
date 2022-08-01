@@ -6,9 +6,8 @@ from element import ConvLayer
 
 
 class DetectLayer(nn.Module):
-    def __init__(self, input_size, in_channels, num_classes, anchors, num_anchor_per_scale, device):
+    def __init__(self, input_size, in_channels, num_classes, anchors, num_anchor_per_scale):
         super().__init__()
-        self.device = device
         self.input_size = input_size
         self.num_classes = num_classes
         self.num_anchor_per_scale = num_anchor_per_scale
@@ -20,10 +19,11 @@ class DetectLayer(nn.Module):
         self.conv = nn.Sequential(
             ConvLayer(in_channels, in_channels*2, 3, stride=1, padding=1),
             nn.Conv2d(in_channels*2, self.last_dim_channels, 1, stride=1, padding=0)
-        ).to(self.device)
+        )
 
 
     def forward(self, x):
+        self.device = x.device
         batch_size = x.shape[0]
         grid_size = x.shape[2]
         self.stride = self.input_size / grid_size
@@ -54,43 +54,40 @@ class DetectLayer(nn.Module):
     def transform_pred_coords(self, bboxes, grid_xy):
         bx = (torch.sigmoid(bboxes[..., 0]) + grid_xy[0]) * self.stride
         by = (torch.sigmoid(bboxes[..., 1]) + grid_xy[1]) * self.stride
-        bw = torch.exp(bboxes[..., 2]) * self.anchor_w
-        bh = torch.exp(bboxes[..., 3]) * self.anchor_h
+        bw = torch.exp(bboxes[..., 2]) * self.anchor_w.to(self.device)
+        bh = torch.exp(bboxes[..., 3]) * self.anchor_h.to(self.device)
         pred_bboxes = torch.stack([bx, by, bw, bh], dim=-1)
         return pred_bboxes
 
 
 
 class YOLOv3_head(nn.Module):
-    def __init__(self, input_size, num_classes, anchors, device):
+    def __init__(self, input_size, num_classes, anchors):
         super().__init__()
         self.input_size = input_size
         self.num_classes = num_classes
         self.num_anchor_per_scale = len(anchors[2])
-        self.anchor_L = torch.Tensor(anchors[2]).to(device)
-        self.anchor_M = torch.Tensor(anchors[1]).to(device)
-        self.anchor_S = torch.Tensor(anchors[0]).to(device)
+        self.anchor_L = torch.Tensor(anchors[2])
+        self.anchor_M = torch.Tensor(anchors[1])
+        self.anchor_S = torch.Tensor(anchors[0])
         
         self.head_L = DetectLayer(input_size=self.input_size,
                                   in_channels=512,
                                   num_classes=self.num_classes,
                                   anchors=self.anchor_L,
-                                  num_anchor_per_scale=self.num_anchor_per_scale,
-                                  device=device)
+                                  num_anchor_per_scale=self.num_anchor_per_scale)
 
         self.head_M = DetectLayer(input_size=self.input_size,
                                   in_channels=256,
                                   num_classes=self.num_classes,
                                   anchors=self.anchor_M,
-                                  num_anchor_per_scale=self.num_anchor_per_scale,
-                                  device=device)
+                                  num_anchor_per_scale=self.num_anchor_per_scale)
 
         self.head_S = DetectLayer(input_size=self.input_size,
                                   in_channels=128,
                                   num_classes=self.num_classes,
                                   anchors=self.anchor_S,
-                                  num_anchor_per_scale=self.num_anchor_per_scale,
-                                  device=device)
+                                  num_anchor_per_scale=self.num_anchor_per_scale)
         
 
     def forward(self, x):
@@ -123,7 +120,7 @@ if __name__ == "__main__":
     x = torch.randn(1, 3, 416, 416).to(device)
     backbone = Darknet53_backbone(pretrained=True).to(device)
     fpn = YOLOv3_FPN().to(device)
-    head = YOLOv3_head(input_size=input_size, num_classes=80, anchors=anchors, device=device)
+    head = YOLOv3_head(input_size=input_size, num_classes=80, anchors=anchors)
 
     with torch.no_grad():
         features = backbone(x)
@@ -132,4 +129,3 @@ if __name__ == "__main__":
 
     for prediction in predictions:
         print(prediction.shape)
-    

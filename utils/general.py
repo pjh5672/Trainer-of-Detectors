@@ -21,6 +21,12 @@ def build_progress_bar(dataloaders):
     return progress_bar
 
 
+def scale_to_original(bboxes, scale_w, scale_h):
+    bboxes[:,[0,2]] *= scale_w
+    bboxes[:,[1,3]] *= scale_h
+    return bboxes.round(2)
+
+
 def box_transform_xcycwh_to_x1y1x2y2(bboxes):
     x1y1 = bboxes[:, :2] - bboxes[:, 2:] / 2
     x2y2 = bboxes[:, :2] + bboxes[:, 2:] / 2
@@ -46,7 +52,6 @@ def get_IoU_target_with_anchor(wh1, wh2):
 
 def check_best_possible_recall(dataloader, PBR_params, anchor_iou_threshold=0.25):
     input_size, num_anchor_per_scale, anchors, strides = PBR_params
-    anchors = [anchor.cpu() for anchor in anchors]
     total_n_target, total_n_anchor = 0, 0
 
     for index, mini_batch in enumerate(dataloader):

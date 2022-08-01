@@ -7,7 +7,7 @@ from yolov3_modules import Darknet53_backbone, YOLOv3_FPN, YOLOv3_head
 
 
 class YOLOv3_Model(nn.Module):
-    def __init__(self, config_path, num_classes, device, pretrained=True):
+    def __init__(self, config_path, num_classes, pretrained=True):
         super().__init__()
     
         with open(config_path) as f:
@@ -15,13 +15,11 @@ class YOLOv3_Model(nn.Module):
 
         self.input_size = item['INPUT_SIZE']
         self.anchors = [x for x in item['ANCHORS'].values()]
-        self.device = device
         self.backbone = Darknet53_backbone(pretrained=pretrained)
         self.fpn = YOLOv3_FPN()
         self.head = YOLOv3_head(input_size=self.input_size, 
                                 num_classes=num_classes, 
-                                anchors=self.anchors, 
-                                device=self.device)
+                                anchors=self.anchors)
 
 
     def forward(self, x):
@@ -30,6 +28,7 @@ class YOLOv3_Model(nn.Module):
         predictions = self.head(features)
 
         return predictions
+
 
 
 if __name__ == "__main__":
@@ -42,10 +41,7 @@ if __name__ == "__main__":
     num_classes = 80
     device = torch.device('cpu')
 
-    model = YOLOv3_Model(config_path=config_path,
-                        num_classes=num_classes,
-                        device=device,
-                        pretrained=True)
+    model = YOLOv3_Model(config_path=config_path, num_classes=num_classes, pretrained=True)
     model = model.to(device)
     model.eval()
     x = torch.randn(2, 3, 416, 416).to(device)
@@ -54,7 +50,3 @@ if __name__ == "__main__":
 
     for prediction in predictions:
         print(prediction.shape)
-        
-    if not model.training:
-        print(predictions.shape)
-        print(predictions[..., :4])

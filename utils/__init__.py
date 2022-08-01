@@ -8,7 +8,8 @@ if str(ROOT) not in sys.path:
 
 from .general import *
 from .process import *
+from .visualize import *
 from .eval import Evaluator
-from .log import build_logger
+from .log_basic import build_logger
+from .log_dpp import setup_primary_logging, setup_worker_logging
 from .cache import CacheMaker
-from .visualize import denormalize, generate_random_color, visualize

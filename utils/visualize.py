@@ -2,6 +2,8 @@ import random
 import cv2
 import numpy as np
 
+from general import box_transform_xcycwh_to_x1y1x2y2, scale_to_original
+
 TEXT_COLOR = (255, 255, 255)
 
 
@@ -47,4 +49,17 @@ def visualize(image, label, class_list, color_list, show_class=False, show_score
     canvas = image.copy()
     for item in label:
         canvas = visualize_bbox(canvas, item, class_list, color_list, show_class=show_class, show_score=show_score)
+    return canvas
+
+
+def visualize_prediction(image_to_info, tensor_image, filename, prediction, class_list, color_list):
+    input_size = tensor_image.shape[-1]
+    img_h = image_to_info[filename]['height']
+    img_w = image_to_info[filename]['width']
+    canvas = denormalize(tensor_image)
+    canvas = cv2.resize(canvas, dsize=(img_w, img_h))
+    pred_voc = prediction.copy()
+    pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5]/input_size)
+    pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=img_w, scale_h=img_h)
+    canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)
     return canvas

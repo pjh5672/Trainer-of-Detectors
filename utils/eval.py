@@ -59,7 +59,7 @@ class Evaluator():
 
 
     def summarize(self, mAP, iouThr=None, areaLbl='all', maxDets=100):
-        iStr = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
+        iStr = '\t - {:<16} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
         titleStr = 'Average Precision'
         typeStr = '(AP)'
         iouStr = '{:0.2f}:{:0.2f}'.format(self.iouThrs[0], self.iouThrs[-1]) if iouThr is None else '{:0.2f}'.format(iouThr)

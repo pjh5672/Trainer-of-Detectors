@@ -3,13 +3,11 @@ import logging
 from datetime import datetime
 
 
-
-def build_logger(log_path, set_level=0):
+def build_logger(log_path, log_name, set_level=0):
     os.makedirs(log_path, exist_ok=True)
-    time_created = datetime.today().strftime('%Y-%m-%d_%H-%M')
 
     formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s', '%Y-%m-%d %H:%M:%S')
-    fileHandler = logging.FileHandler(log_path / f'{time_created}.txt')
+    fileHandler = logging.FileHandler(log_path / log_name)
     fileHandler.setFormatter(formatter)
 
     logger_levels = [
@@ -25,13 +23,3 @@ def build_logger(log_path, set_level=0):
     logger.addHandler(fileHandler)
     return logger
 
-
-
-if __name__ == '__main__':
-    from pathlib import Path
-
-    log_path = 'log-test'
-    level = 0
-    logger = Basic_Logger(log_path=Path(log_path), set_level=level)
-    message = 'good-good'
-    logger.debug(message)

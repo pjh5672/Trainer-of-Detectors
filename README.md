@@ -15,6 +15,7 @@ This is repository for source codes to train various detection models.
 
 | Date | Content |
 |:----:|:-----|
+| 08-01 | add:torch DistributedDataParallel(DDP) model train function on multi-GPUs |
 | 07-30 | fix:loss function, mAP calculate error debug when validation mode |
 | 07-28 | add:mAP evaluation function, mAP logging, basic augmentation implementation |
 | 07-12 | add:COCO evaluation API test env initial build |

@@ -27,11 +27,10 @@ class YOLOv3_Loss():
         self.coeff_coord = item['COEFFICIENT_COORD']
         self.coeff_noobj = item['COEFFICIENT_NOOBJ']
 
-        self.device = model.device
         self.num_classes = model.head.num_classes
         self.num_anchor_per_scale = model.head.num_anchor_per_scale
 
-        dummy_x = torch.randn(1, 3, self.input_size, self.input_size).to(self.device) 
+        dummy_x = torch.randn(1, 3, self.input_size, self.input_size)
         with torch.no_grad():
             self.dummy_y = model(dummy_x)
 
@@ -44,10 +43,11 @@ class YOLOv3_Loss():
 
 
     def __call__(self, predictions, targets):
+        self.device = predictions[0].device
         coord_loss, obj_loss, noobj_loss, cls_loss, total_loss = 0., 0., 0., 0., 0.
-
+        
         for scale_index in range(self.num_anchors):
-            anchor_each_scale = self.anchors[scale_index]
+            anchor_each_scale = self.anchors[scale_index].to(self.device)
             stride_each_scale = self.strides[scale_index]
             prediction_each_scale = predictions[scale_index]
             self.batch_size, num_preds, _ = prediction_each_scale.shape

@@ -1,0 +1,251 @@
+import os
+import logging
+import argparse
+from pathlib import Path
+from datetime import datetime
+from collections import defaultdict
+
+import cv2
+import yaml
+import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
+import torch.backends.cudnn as cudnn
+from torch.utils.data import DataLoader, distributed
+from torch.nn.parallel import DistributedDataParallel as DDP
+from tqdm import tqdm
+
+from dataloader import Dataset, build_transformer
+from models import YOLOv3_Model
+from loss_function import YOLOv3_Loss
+from utils import *
+
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]
+cudnn.benchmark = True
+
+
+
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12345'
+    # initialize the process group (beckend for DDP: nccl)
+    dist.init_process_group('nccl', rank=rank, world_size=world_size)
+
+
+def cleanup():
+    dist.destroy_process_group()
+
+
+def execute_train(rank, dataloader, model, criterion, optimizer):
+    loss_per_phase = defaultdict(float)
+    loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
+    model.train()
+
+    for index, mini_batch in enumerate(dataloader):
+        images = mini_batch[0].cuda(rank, non_blocking=True) 
+        targets = mini_batch[1]
+        filenames = mini_batch[2]
+
+        with torch.set_grad_enabled(True):
+            predictions = model(images)
+
+        losses = criterion(predictions, targets)
+        optimizer.zero_grad()
+        losses[0].backward()
+        optimizer.step()
+
+        monitor_text = ''
+        for loss_name, loss_value in zip(loss_types, losses):
+            loss_per_phase[f'{loss_name}'] += loss_value
+            monitor_text += f'{loss_name}: {loss_value.item():.2f} '
+        if rank == 0:
+            dataloader.set_postfix_str(s=f'{monitor_text}')
+    
+    for loss_name in loss_per_phase.keys():
+        loss_per_phase[loss_name] /= len(dataloader)
+        dist.all_reduce(loss_per_phase[loss_name], op=dist.ReduceOp.SUM)
+    
+    del mini_batch, losses
+    torch.cuda.empty_cache()
+    return loss_per_phase
+    
+
+@torch.no_grad()
+def execute_val(rank, world_size, config, dataloader, model, criterion, evaluator, class_list, color_list):
+    loss_per_phase = defaultdict(float)
+    loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
+    gather_objects = [None, ] * world_size
+    detections = []
+    model.eval()
+
+    for index, mini_batch in enumerate(dataloader):
+        if index == 0:
+            canvas = mini_batch[0][0]
+
+        images = mini_batch[0].cuda(rank, non_blocking=True) 
+        targets = mini_batch[1]
+        filenames = mini_batch[2]
+
+        predictions = model(images)
+        losses = criterion(predictions, targets)
+
+        for idx in range(len(filenames)):
+            filename = filenames[idx]
+            pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
+            pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
+            pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'])
+            if len(pred_yolo) > 0:
+                detections.append((filename, pred_yolo))
+
+        monitor_text = ''
+        for loss_name, loss_value in zip(loss_types, losses):
+            loss_per_phase[f'{loss_name}'] += loss_value
+            monitor_text += f'{loss_name}: {loss_value.item():.2f} '
+            
+        if rank == 0:
+            dataloader.set_postfix_str(s=f'{monitor_text}')
+
+    for loss_name in loss_per_phase.keys():
+        loss_per_phase[loss_name] /= len(dataloader)
+        dist.all_reduce(loss_per_phase[loss_name], op=dist.ReduceOp.SUM)
+    dist.all_gather_object(gather_objects, detections)
+
+    filename, pred_yolo = detections[0]
+    canvas = visualize_prediction(evaluator.image_to_info, canvas, filename, pred_yolo, class_list, color_list)
+    del mini_batch, losses
+    torch.cuda.empty_cache()
+    return loss_per_phase, gather_objects, canvas
+
+
+def main_work(rank, world_size, args, logger, time_created):
+    ################################### Init Params ###################################
+    setup_worker_logging(rank, logger)
+
+    with open(args.data_path) as f:
+        data_item = yaml.load(f, Loader=yaml.FullLoader)
+    with open(args.config_path) as f:
+        config_item = yaml.load(f, Loader=yaml.FullLoader)
+    
+    input_size = config_item['INPUT_SIZE']
+    class_list = data_item['NAMES']
+    color_list = generate_random_color(num_colors=len(class_list))
+    transformers = build_transformer(image_size=(input_size, input_size))
+    train_set = Dataset(data_path=args.data_path, phase='train', transformer=transformers['train'])
+    val_set = Dataset(data_path=args.data_path, phase='val', transformer=transformers['val'])
+    model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
+    criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config_item['LEARNING_RATE'])
+    val_file = args.data_path.parent / data_item['mAP_FILE']
+    assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
+    evaluator = Evaluator(GT_file=val_file, model_input_size=input_size)
+    
+    if rank == 0:
+        dataloader = DataLoader(train_set, batch_size=config_item['BATCH_SIZE'], 
+                                collate_fn=Dataset.collate_fn, num_workers=world_size*4, pin_memory=True)
+        dataloader = tqdm(dataloader, desc='Calculating Best Possible Rate(BPR)...', ncols=200)
+        PBR_params = [input_size, criterion.num_anchor_per_scale, criterion.anchors, criterion.strides]
+        BPR_rate, total_n_anchor, total_n_target = check_best_possible_recall(dataloader, PBR_params, config_item['ANCHOR_IOU_THRESHOLD'])
+        message = f'Input Size: {input_size}'
+        logging.warning(message)
+        message = f'Best Possible Rate: {BPR_rate:0.4f}, Total_anchor/Total_target: {total_n_anchor}/{total_n_target}'
+        logging.warning(message)
+        del dataloader
+        
+
+    ################################### Init Process ###################################
+    setup(rank, world_size)
+
+    ################################### Init Loader ####################################
+    train_sampler = distributed.DistributedSampler(train_set, num_replicas=world_size, rank=rank, shuffle=True)
+    val_sampler = distributed.DistributedSampler(val_set, num_replicas=world_size, rank=rank, shuffle=False)
+    train_loader = DataLoader(dataset=train_set, 
+                             collate_fn=Dataset.collate_fn, 
+                             batch_size=int(config_item['BATCH_SIZE']/world_size), 
+                             shuffle=False, num_workers=world_size*4, 
+                             pin_memory=True, sampler=train_sampler)
+    val_loader = DataLoader(dataset=val_set, 
+                            collate_fn=Dataset.collate_fn, 
+                            batch_size=int(config_item['BATCH_SIZE']/world_size),
+                            shuffle=False, num_workers=world_size*4, 
+                            pin_memory=True, sampler=val_sampler)
+
+    #################################### Init Model ####################################
+    torch.manual_seed(2023)
+    torch.cuda.set_device(rank)
+    model = model.cuda(rank)
+    model = DDP(model, device_ids=[rank])
+
+    #################################### Load Model ####################################
+    dist.barrier() # let all processes sync up before starting
+    if config_item['WEIGHT_PATH'] is not None:
+        if rank == 0:
+            logging.warning(f'Path to pretrained model: {config_item["WEIGHT_PATH"]}')
+        map_location = {'cuda:%d' % 0: 'cuda:%d' % rank}
+        checkpoint = torch.load(config_item['WEIGHT_PATH'], map_location=map_location)
+        model.load_state_dict(checkpoint, strict=True)
+
+    #################################### Train Model ####################################
+    best_mAP = 0.01
+    progress_bar = tqdm(range(1, config_item['NUM_EPOCHS']+1), ncols=200) if rank == 0 else range(1, config_item['NUM_EPOCHS']+1)
+
+    for epoch in progress_bar:
+        message = f'[Epoch:{epoch:02d}/{len(progress_bar):03d}]'
+        if rank == 0:
+            progress_bar.set_description(desc=message)
+            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', leave=False, ncols=200)
+            val_loader = tqdm(val_loader, desc='[Phase:VAL]', leave=False, ncols=200)
+        
+        train_loss = execute_train(rank=rank, dataloader=train_loader, model=model, criterion=criterion, optimizer=optimizer)
+        val_loss, gather_objects, canvas = execute_val(rank=rank, world_size=world_size, 
+                                                        config=config_item, dataloader=val_loader,
+                                                        model=model, criterion=criterion, evaluator=evaluator, 
+                                                        class_list=class_list, color_list=color_list)
+
+        if rank == 0:
+            monitor_text = f' Train Loss: {train_loss["total"]/world_size:.2f}, Val Loss: {val_loss["total"]/world_size:.2f}'
+            detections = []
+            for det in gather_objects:
+                detections.extend(det)
+            mAP_info, eval_text = evaluator(detections)
+            logging.warning(message + monitor_text)
+            logging.warning(eval_text)
+
+            if mAP_info['all']['mAP05'] > best_mAP:
+                best_mAP = mAP_info['all']['mAP05']
+                save_model(model=model, save_path=args.exp_path / 'weights', model_name=f'{time_created}-EP{epoch:02d}.pth')                    
+
+            if epoch % args.img_log_interval == 0:
+                imwrite(str(args.exp_path / 'images' / f'{time_created}-EP{epoch:02d}.jpg'), canvas)
+    cleanup()
+
+
+def main():
+    time_created = datetime.today().strftime('%Y-%m-%d_%H-%M')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_path', type=str, default='data/coco128.yml', help='Path to data.yml file')
+    parser.add_argument('--config_path', type=str, default='config/yolov3.yml', help='Path to config.yml file')
+    parser.add_argument('--exp_name', type=str, default=str(time_created), help='Name to log training')
+    parser.add_argument('--gpu_ids', type=int, help='List of GPU IDs', nargs='+', required=True)
+    parser.add_argument('--img_log_interval', type=int, default=5, help='Image logging interval')
+    args = parser.parse_args()
+    
+    args.data_path = ROOT / args.data_path
+    args.config_path = ROOT / args.config_path
+    args.exp_path = ROOT / 'experiments' / args.exp_name
+    args.exp_path = ROOT / 'experiments' / args.exp_name
+    os.makedirs(args.exp_path / 'images', exist_ok=True)
+    os.makedirs(args.exp_path / 'logs', exist_ok=True)
+    world_size = len(args.gpu_ids)
+    assert world_size > 0, 'Not executable supported GPU machines, This training supports on CUDA available environment.'
+    
+    #########################################################
+    # Set multiprocessing type to spawn
+    torch.multiprocessing.set_start_method('spawn', force=True)
+    logger = setup_primary_logging(args.exp_path / 'logs' / f'{time_created}.log')
+    mp.spawn(main_work, args=(world_size, args, logger, time_created), nprocs=world_size, join=True)
+    #########################################################
+
+if __name__ == '__main__':
+    main()
