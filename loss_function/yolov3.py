@@ -188,13 +188,14 @@ class YOLOv3_Loss():
 if __name__ == "__main__":
     import sys
     from pathlib import Path
+    from torch.utils.data import DataLoader
     
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
     if str(ROOT) not in sys.path:
         sys.path.append(str(ROOT))
 
-    from dataloader import build_dataloader
+    from dataloader import Dataset, build_transformer
     from models import YOLOv3_Model
 
     data_path = ROOT / 'data' / 'coco128.yml'
@@ -207,8 +208,14 @@ if __name__ == "__main__":
     batch_size = 2
     device = torch.device('cpu')
 
-    dataloaders, classname_list = build_dataloader(data_path=data_path, image_size=(input_size, input_size), batch_size=batch_size)
-    model = YOLOv3_Model(config_path=config_path, num_classes=len(classname_list), device=device, pretrained=True)
+    transformers = build_transformer(image_size=(416, 416))
+    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
+    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
+    dataloaders = {}
+    dataloaders['train'] = DataLoader(train_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)
+    dataloaders['val'] = DataLoader(val_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)         
+    class_list = train_dset.classname_list
+    model = YOLOv3_Model(config_path=config_path, num_classes=len(class_list), pretrained=True)
     model = model.to(device)
     criterion = YOLOv3_Loss(config_path=config_path, model=model)
 

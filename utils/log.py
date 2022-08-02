@@ -87,7 +87,7 @@ def setup_worker_logging(rank: int, log_queue: Queue):
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12345'
-    # initialize the process group (beckend for linux: nccl, win: gloo)
+    # initialize the process group
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 
@@ -104,6 +104,9 @@ def worker(rank: int, world_size: int, log_queue: Queue):
     torch.cuda.set_device(rank)
     setup(rank, world_size)
 
+    # Rest of the training code #
+
+    #############################
     
 
 if __name__ == "__main__":

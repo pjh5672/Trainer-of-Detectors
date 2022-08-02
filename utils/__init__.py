@@ -10,6 +10,5 @@ from .general import *
 from .process import *
 from .visualize import *
 from .eval import Evaluator
-from .log_basic import build_logger
-from .log_dpp import setup_primary_logging, setup_worker_logging
+from .log import setup_primary_logging, setup_worker_logging
 from .cache import CacheMaker

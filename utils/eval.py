@@ -7,30 +7,26 @@ from utils import box_transform_xcycwh_to_x1y1x2y2, scale_to_original
 
 
 class Evaluator():
-    def __init__(self, GT_file, model_input_size):
+    def __init__(self, GT_file, config):
         with open(GT_file, 'r') as ann_file:
             GT_data = json.load(ann_file)
 
         self.image_to_info = {}
         for item in GT_data['images']:
-            self.image_to_info[item['filename']] = {
-                'image_id': item['id'],
-                'height': item['height'],
-                'width': item['width']
-            }
-
-        self.maxDets = 100
+            self.image_to_info[item['filename']] = {'image_id': item['id'],
+                                                    'height': item['height'],
+                                                    'width': item['width']}
+        self.maxDets = config['MAX_DETS']
+        self.input_size = config['INPUT_SIZE']
         self.areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
         self.areaRngLbl = ['all', 'small', 'medium', 'large']
         self.iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
-        self.input_size = model_input_size
         self.classes_index = list(map(int, GT_data['categories'].keys()))
         self.groundtruths = self.split_areaRng(GT_data['annotations'])
 
 
     def __call__(self, predictions):
         all_preds_dict = self.transform_pred_format(predictions)
-        all_preds_dict = self.cutoff_maxDets(all_preds_dict, maxDets=self.maxDets)
         detections = self.split_areaRng(all_preds_dict)
 
         mAP_info = {}
@@ -189,15 +185,6 @@ class Evaluator():
             elif self.areaRng[3][0] <= item['area'] < self.areaRng[3][1]:
                 items[self.areaRngLbl[3]].append(item)
         return items
-
-    
-    def cutoff_maxDets(self, predictions, maxDets):
-        image_ids = set(map(lambda x:x['image_id'], predictions))
-        dets_per_image = [[item for item in predictions if item['image_id']==x][:maxDets] for x in image_ids]
-        new_predictions = []
-        for item in dets_per_image:
-            new_predictions.extend(item)
-        return new_predictions
 
 
     def transform_pred_format(self, predictions):

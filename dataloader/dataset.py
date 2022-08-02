@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import torch
 from tqdm import tqdm
-from torch.utils.data import DataLoader
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]
@@ -17,7 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 from transform import build_transformer
-from utils import CacheMaker, box_transform_xcycwh_to_x1y1x2y2, box_transform_x1y1x2y2_to_xcycwh
+from utils import *
 
 
 
@@ -184,26 +183,19 @@ class Dataset():
 
 
 
-def build_dataloader(data_path, image_size=(448, 448), batch_size=4):
-    transformers = build_transformer(image_size=image_size)
-    
-    dataloaders = {}
-    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
-    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
-    dataloaders['train'] = DataLoader(train_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, 
-                                      shuffle=True, pin_memory=True)
-    dataloaders['val'] = DataLoader(val_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, 
-                                    shuffle=False, pin_memory=True)
-    return dataloaders, train_dset.classname_list
-
-
-
 if __name__ == '__main__':
+    from torch.utils.data import DataLoader
+
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
 
     data_path = ROOT / 'data' / 'coco128.yml'
-    dataloaders, classname_list = build_dataloader(data_path=data_path, image_size=(448, 448), batch_size=4)
+    transformers = build_transformer(image_size=(416, 416))
+    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
+    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
+    dataloaders = {}
+    dataloaders['train'] = DataLoader(train_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)
+    dataloaders['val'] = DataLoader(val_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)         
 
     # sanity check
     for _ in range(1):

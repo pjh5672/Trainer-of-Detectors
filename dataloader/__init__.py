@@ -6,5 +6,5 @@ ROOT = FILE.parents[0]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from .dataset import Dataset, build_dataloader
+from .dataset import Dataset
 from .transform import build_transformer

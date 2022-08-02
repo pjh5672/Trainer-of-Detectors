@@ -52,11 +52,11 @@ def get_IoU_target_with_anchor(wh1, wh2):
 
 def check_best_possible_recall(dataloader, PBR_params, anchor_iou_threshold=0.25):
     input_size, num_anchor_per_scale, anchors, strides = PBR_params
-    total_n_target, total_n_anchor = 0, 0
+    total_n_target, total_n_train = 0, 0
 
     for index, mini_batch in enumerate(dataloader):
         targets = mini_batch[1]
-        n_target_per_mini_batch, n_anchor_per_mini_batch = 0, 0
+        n_target_per_mini_batch, n_train_per_mini_batch = 0, 0
 
         for target in targets:
             target = torch.from_numpy(target)
@@ -83,15 +83,13 @@ def check_best_possible_recall(dataloader, PBR_params, anchor_iou_threshold=0.25
             _, non_overlap_index = np.unique(alined_anchor[:, 0:3], axis=0, return_index=True)
             non_overlap_anchor = alined_anchor[non_overlap_index]
             best_possible_anchor = non_overlap_anchor[non_overlap_anchor[:, 3] > anchor_iou_threshold]
-            
+            n_train_per_mini_batch += len(best_possible_anchor)
             n_target_per_mini_batch += len(target)
-            n_anchor_per_mini_batch += len(best_possible_anchor)
-        
+            
+        total_n_train += n_train_per_mini_batch
         total_n_target += n_target_per_mini_batch
-        total_n_anchor += n_anchor_per_mini_batch
-    
-    BPR_rate = total_n_anchor/total_n_target
-    return BPR_rate, total_n_anchor, total_n_target
+        
+    return total_n_train, total_n_target
 
 
 def imwrite(filename, img, params=None):

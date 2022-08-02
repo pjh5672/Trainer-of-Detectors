@@ -15,13 +15,6 @@ def build_transformer(image_size=(416, 416)):
         ToTensorV2()],
         bbox_params=album.BboxParams(format='yolo', min_area=40, min_visibility=0.05 ,label_fields=['class_ids']),
     )
-    # transformers['train'] = album.Compose([
-    #     album.HorizontalFlip(p=0.5),
-    #     album.Resize(height=image_size[0], width=image_size[1]),
-    #     album.Normalize(mean=(0.485, 0.456, 0.406),std=(0.229, 0.224, 0.225)),
-    #     ToTensorV2()],
-    #     bbox_params=album.BboxParams(format='yolo', label_fields=['class_ids']),
-    # )
     
     transformers['val'] = album.Compose([
             album.Resize(height=image_size[0], width=image_size[1]),
