@@ -17,7 +17,8 @@ This is repository for source code to train various object detection models.  cu
 
 ## <div align="center">Updates</div>
 
-#### <details><summary><b> Timeline in 2022 </b></summary>  
+<details>
+    <summary><b> Timeline in 2022 </b></summary>
 
 | Date | Content |
 |:----:|:-----|
