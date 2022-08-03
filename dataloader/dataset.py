@@ -57,13 +57,13 @@ class Dataset():
     
     
     def __getitem__(self, index):
-        pad_h, pad_w = 0, 0
+        max_side, pad_h, pad_w = 0, 0, 0
         filename, image = self.get_image(index)
         class_ids, bboxes = self.get_label(index)
-        image, bboxes, (pad_h, pad_w) = transform_square_image(image, bboxes)
-        bboxes = clip_box_coordinates(bboxes)
 
         if self.transformer:
+            image, bboxes, (max_side, pad_h, pad_w) = transform_square_image(image, bboxes)
+            bboxes = clip_box_coordinates(bboxes)
             transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             image = transformed_data['image']
             bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)
@@ -74,7 +74,7 @@ class Dataset():
                 bboxes = np.array([[0.5, 0.5, 1., 1.]], dtype=np.float32)
             
         target = np.concatenate((class_ids[:, np.newaxis], bboxes), axis=1)
-        return image, target, filename, (pad_h, pad_w)
+        return image, target, filename, (max_side, pad_h, pad_w)
     
     
     def replace_image2label_paths(self, image_paths):
@@ -173,15 +173,15 @@ class Dataset():
         images = []
         targets = []
         filenames = []
-        pads_hw = []
+        ori_size_infos = []
         
-        for image, target, filename, pad_hw in mini_batch:
+        for image, target, filename, ori_size_info in mini_batch:
             images.append(image)
             targets.append(target)
             filenames.append(filename)
-            pads_hw.append(pad_hw)
+            ori_size_infos.append(ori_size_info)
         
-        return torch.stack(images, dim=0), targets, filenames, pads_hw
+        return torch.stack(images, dim=0), targets, filenames, ori_size_infos
 
 
 
@@ -192,7 +192,7 @@ if __name__ == '__main__':
     ROOT = FILE.parents[1]
 
     data_path = ROOT / 'data' / 'coco128.yml'
-    transformers = build_transformer(image_size=(416, 416))
+    transformers = build_transformer(input_size=(416, 416))
     train_dset = Dataset(data_path=data_path, phase='train', rank=0, time_created='123', transformer=transformers['train'])
     val_dset = Dataset(data_path=data_path, phase='val', rank=0, time_created='123', transformer=transformers['val'])
     dataloaders = {}
@@ -206,7 +206,7 @@ if __name__ == '__main__':
                 images = minibatch[0]
                 targets = minibatch[1]
                 filenames = minibatch[2]
-                pads_hw = minibatch[3]
+                ori_size_infos = minibatch[3]
     
                 if index % 30 == 0:
-                    print(f"{phase} - {index}/{len(dataloaders[phase])} - {pads_hw}")
+                    print(f"{phase} - {index}/{len(dataloaders[phase])} - {ori_size_infos}")

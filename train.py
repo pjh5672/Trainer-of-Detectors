@@ -97,20 +97,20 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
         images = mini_batch[0].cuda(rank, non_blocking=True) 
         targets = mini_batch[1]
         filenames = mini_batch[2]
-        pads_hw = minibatch[3]
+        ori_size_infos = minibatch[3]
 
         predictions = model(images)
         losses = criterion(predictions, targets)
 
         for idx in range(len(filenames)):
-            pad_hw = pads_hw[idx]
             filename = filenames[idx]
+            ori_size_info = ori_size_infos[idx]
             pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
             pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
             pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
             pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'],  maxDets=config['MAX_DETS'])
             if len(pred_yolo) > 0:
-                detections.append((filename, pred_yolo))
+                detections.append((filename, pred_yolo, ori_size_info))
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
@@ -129,8 +129,8 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
-    filename, pred_yolo = detections[0]
-    canvas = visualize_prediction(evaluator.image_to_info, canvas, filename, pred_yolo, class_list, color_list)
+    filename, pred_yolo, ori_size_info = detections[0]
+    canvas = visualize_prediction(config['INPUT_SIZE'], ori_size_info, canvas, pred_yolo, class_list, color_list)
     del mini_batch, losses
     torch.cuda.empty_cache()
     return loss_per_phase, gather_objects, canvas
@@ -150,7 +150,7 @@ def main_work(rank, world_size, args, logger):
     input_size = config_item['INPUT_SIZE']
     class_list = data_item['NAMES']
     color_list = generate_random_color(num_colors=len(class_list))
-    transformers = build_transformer(image_size=(input_size, input_size))
+    transformers = build_transformer(input_size=(input_size, input_size))
     train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=transformers['train'])
     val_set = Dataset(data_path=args.data_path, phase='val', rank=rank, time_created=TIMESTAMP, transformer=transformers['val'])
     
