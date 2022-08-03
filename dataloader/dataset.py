@@ -15,7 +15,7 @@ ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from transform import *
+from transform import build_transformer, transform_square_image
 from utils import *
 
 
@@ -57,9 +57,12 @@ class Dataset():
     
     
     def __getitem__(self, index):
+        pad_h, pad_w = 0, 0
         filename, image = self.get_image(index)
         class_ids, bboxes = self.get_label(index)
-         
+        image, bboxes, (pad_h, pad_w) = transform_square_image(image, bboxes)
+        bboxes = clip_box_coordinates(bboxes)
+
         if self.transformer:
             transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             image = transformed_data['image']
@@ -71,7 +74,7 @@ class Dataset():
                 bboxes = np.array([[0.5, 0.5, 1., 1.]], dtype=np.float32)
             
         target = np.concatenate((class_ids[:, np.newaxis], bboxes), axis=1)
-        return image, target, filename
+        return image, target, filename, (pad_h, pad_w)
     
     
     def replace_image2label_paths(self, image_paths):
@@ -92,7 +95,6 @@ class Dataset():
             label = np.array(item, dtype=np.float32)
         
         class_ids, bboxes = self.check_no_label(label)
-        bboxes = self.clip_box_coordinates(bboxes)
         return class_ids, bboxes
     
         
@@ -112,12 +114,6 @@ class Dataset():
             bboxes = label[:, 1:5]
         return class_ids, bboxes
     
-
-    def clip_box_coordinates(self, bboxes):
-        bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
-        bboxes = box_transform_x1y1x2y2_to_xcycwh(bboxes)
-        return bboxes
-
 
     def generate_GT_for_mAP(self, save_dir, file_name, phase, rank):
         if not save_dir.is_dir():
@@ -139,6 +135,7 @@ class Dataset():
                     pbar.set_description(f'Generating [{phase.upper()}] GT file for mAP evaluation...')
                 filename, image = self.get_image(index)
                 class_ids, bboxes = self.get_label(index)
+                bboxes = clip_box_coordinates(bboxes)
                 bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
 
                 height, width, _ = image.shape
@@ -176,13 +173,15 @@ class Dataset():
         images = []
         targets = []
         filenames = []
+        pads_hw = []
         
-        for image, target, filename in mini_batch:
+        for image, target, filename, pad_hw in mini_batch:
             images.append(image)
             targets.append(target)
             filenames.append(filename)
+            pads_hw.append(pad_hw)
         
-        return torch.stack(images, dim=0), targets, filenames
+        return torch.stack(images, dim=0), targets, filenames, pads_hw
 
 
 
@@ -207,6 +206,7 @@ if __name__ == '__main__':
                 images = minibatch[0]
                 targets = minibatch[1]
                 filenames = minibatch[2]
-                        
+                pads_hw = minibatch[3]
+    
                 if index % 30 == 0:
-                    print(f"{phase} - {index}/{len(dataloaders[phase])}")
+                    print(f"{phase} - {index}/{len(dataloaders[phase])} - {pads_hw}")

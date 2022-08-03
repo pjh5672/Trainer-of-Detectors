@@ -5,7 +5,6 @@ import numpy as np
 from tqdm import tqdm
 
 
-
 def save_model(model, save_path, model_name):
     os.makedirs(save_path, exist_ok=True)
     torch.save(model.state_dict(), save_path / model_name)
@@ -15,6 +14,12 @@ def scale_to_original(bboxes, scale_w, scale_h):
     bboxes[:,[0,2]] *= scale_w
     bboxes[:,[1,3]] *= scale_h
     return bboxes.round(2)
+
+
+def clip_box_coordinates(bboxes):
+    bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
+    bboxes = box_transform_x1y1x2y2_to_xcycwh(bboxes)
+    return bboxes
 
 
 def box_transform_xcycwh_to_x1y1x2y2(bboxes):

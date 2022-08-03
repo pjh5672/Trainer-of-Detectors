@@ -1,11 +1,6 @@
 import numpy as np
 
 
-def normalize_bbox_coords(bboxes, input_size):
-    normed_bboxes = (bboxes/input_size).clip(min=0., max=1.)
-    return normed_bboxes
-
-
 def filter_obj_score(prediction, conf_threshold=0.01):
     valid_index = (prediction[:, 4] >= conf_threshold)
     bboxes = prediction[:, :4][valid_index]

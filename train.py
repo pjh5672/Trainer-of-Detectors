@@ -97,13 +97,16 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
         images = mini_batch[0].cuda(rank, non_blocking=True) 
         targets = mini_batch[1]
         filenames = mini_batch[2]
+        pads_hw = minibatch[3]
+
         predictions = model(images)
         losses = criterion(predictions, targets)
 
         for idx in range(len(filenames)):
+            pad_hw = pads_hw[idx]
             filename = filenames[idx]
             pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
-            pred_yolo[:, :4] = normalize_bbox_coords(bboxes=pred_yolo[:, :4], input_size=config['INPUT_SIZE'])
+            pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
             pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
             pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'],  maxDets=config['MAX_DETS'])
             if len(pred_yolo) > 0:

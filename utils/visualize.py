@@ -14,7 +14,7 @@ def denormalize(input_tensor, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.2
     tensor.clamp_(min=0, max=1.)
     tensor *= 255.
     image = tensor.permute(1,2,0).numpy().astype(np.uint8)
-    return image[..., ::-1]
+    return image
 
 
 def generate_random_color(num_colors):
