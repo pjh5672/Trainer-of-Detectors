@@ -209,8 +209,8 @@ if __name__ == "__main__":
     device = torch.device('cpu')
 
     transformers = build_transformer(image_size=(416, 416))
-    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
-    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
+    train_dset = Dataset(data_path=data_path, phase='train', rank=0, time_created='123', transformer=transformers['train'])
+    val_dset = Dataset(data_path=data_path, phase='val', rank=0, time_created='123', transformer=transformers['val'])
     dataloaders = {}
     dataloaders['train'] = DataLoader(train_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)
     dataloaders['val'] = DataLoader(val_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)         

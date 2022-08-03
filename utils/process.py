@@ -1,6 +1,10 @@
 import numpy as np
 
 
+def normalize_bbox_coords(bboxes, input_size):
+    normed_bboxes = (bboxes/input_size).clip(min=0., max=1.)
+    return normed_bboxes
+
 
 def filter_obj_score(prediction, conf_threshold=0.01):
     valid_index = (prediction[:, 4] >= conf_threshold)
@@ -11,7 +15,7 @@ def filter_obj_score(prediction, conf_threshold=0.01):
 
 
 def run_NMS_for_yolo(prediction, iou_threshold=0.5, maxDets=100):
-    bboxes = prediction[:, 1:5]
+    bboxes = prediction[:, 1:5] * 100
     scores = prediction[:, 5]
 
     if len(bboxes) == 0:
@@ -34,13 +38,14 @@ def run_NMS_for_yolo(prediction, iou_threshold=0.5, maxDets=100):
 
         if len(order) == 1:
             break
-            
+
         xx1 = np.maximum(x1[i], x1[order[1:]])
         yy1 = np.maximum(y1[i], y1[order[1:]])
         xx2 = np.minimum(x2[i], x2[order[1:]])
         yy2 = np.minimum(y2[i], y2[order[1:]])
         w = np.maximum(0, xx2 - xx1 + 1)
         h = np.maximum(0, yy2 - yy1 + 1)
+
         overlap = (w * h)
         ious = overlap / (areas[0] + areas[order[1:]] - overlap + 1e-8)
         order = order[np.where(ious <= iou_threshold)[0] + 1]

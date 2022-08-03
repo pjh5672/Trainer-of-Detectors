@@ -15,13 +15,13 @@ ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from transform import build_transformer
+from transform import build_transformer, transform_square_image
 from utils import *
 
 
 
 class Dataset():
-    def __init__(self, data_path, phase, transformer=None):
+    def __init__(self, data_path, phase, rank, time_created, transformer=None):
         with open(data_path) as f:
             data_item = yaml.load(f, Loader=yaml.FullLoader)
         
@@ -32,22 +32,24 @@ class Dataset():
         self.image_paths = []
         for sub_dir in data_item[self.phase.upper()]:
             image_dir = self.data_dir / sub_dir
-            self.image_paths += [str(image_dir / fn) for fn in os.listdir(image_dir) \
-                                 if fn.lower().endswith(('png','jpg','jpeg'))]
+            self.image_paths += [str(image_dir / fn) for fn in os.listdir(image_dir) if fn.lower().endswith(('png','jpg','jpeg'))]
         self.label_paths = self.replace_image2label_paths(self.image_paths)
         self.generate_no_label(self.label_paths)
 
         GT_dir = Path(data_path).parent / 'evals'
         cache_dir = Path(data_path).parent / 'caches'
         save_name = Path(data_path).name.split('.')[0]
-        
+         
         if phase == 'val':
-            self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase)
-            
-        cache_maker = CacheMaker(cache_dir=cache_dir, file_name=save_name, phase=phase)
-        cache = cache_maker(self.image_paths, self.label_paths)
+            self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase, rank=rank)
+        if rank == 0:
+            data_path = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=200)
+        else:
+            data_path = zip(self.image_paths, self.label_paths)
+
+        cache, self.data_info = make_cache_file(cache_dir=cache_dir, file_name=save_name, phase=phase, 
+                                                data_path=data_path, time_created=time_created)
         assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files" 
-        
         self.transformer = transformer
 
 
@@ -59,6 +61,8 @@ class Dataset():
         class_ids, bboxes = self.get_label(index)
          
         if self.transformer:
+            if self.phase == 'val':
+                image = transform_square_image(image)
             transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             image = transformed_data['image']
             bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)
@@ -117,7 +121,7 @@ class Dataset():
         return bboxes
 
 
-    def generate_GT_for_mAP(self, save_dir, file_name, phase):
+    def generate_GT_for_mAP(self, save_dir, file_name, phase, rank):
         if not save_dir.is_dir():
             os.makedirs(save_dir, exist_ok=True)
         save_path = save_dir / f'{file_name}_{phase}.json'
@@ -129,11 +133,12 @@ class Dataset():
             eval_data['categories'] = {}
             eval_data['timestamp'] = datetime.today().strftime('%Y-%m-%d_%H:%M')
             
-            pbar = tqdm(range(len(self.label_paths)), ncols=200)
+            pbar = tqdm(range(len(self.label_paths)), ncols=200) if rank == 0 else range(len(self.label_paths))
             img_id = 0
             anno_id = 0
             for index in pbar:
-                pbar.set_description(f'Generating GT file for mAP evaluation...')
+                if rank == 0:
+                    pbar.set_description(f'Generating [{phase.upper()}] GT file for mAP evaluation...')
                 filename, image = self.get_image(index)
                 class_ids, bboxes = self.get_label(index)
                 bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
@@ -191,11 +196,11 @@ if __name__ == '__main__':
 
     data_path = ROOT / 'data' / 'coco128.yml'
     transformers = build_transformer(image_size=(416, 416))
-    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
-    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
+    train_dset = Dataset(data_path=data_path, phase='train', rank=0, time_created='123', transformer=transformers['train'])
+    val_dset = Dataset(data_path=data_path, phase='val', rank=0, time_created='123', transformer=transformers['val'])
     dataloaders = {}
-    dataloaders['train'] = DataLoader(train_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)
-    dataloaders['val'] = DataLoader(val_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)         
+    dataloaders['train'] = DataLoader(train_dset, batch_size=1, collate_fn=Dataset.collate_fn, pin_memory=True)
+    dataloaders['val'] = DataLoader(val_dset, batch_size=1, collate_fn=Dataset.collate_fn, pin_memory=True)         
 
     # sanity check
     for _ in range(1):

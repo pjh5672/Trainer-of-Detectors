@@ -7,4 +7,4 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 from .dataset import Dataset
-from .transform import build_transformer
+from .transform import build_transformer, transform_square_image

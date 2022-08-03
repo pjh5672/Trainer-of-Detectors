@@ -17,7 +17,6 @@ class Evaluator():
                                                     'height': item['height'],
                                                     'width': item['width']}
         self.maxDets = config['MAX_DETS']
-        self.input_size = config['INPUT_SIZE']
         self.areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
         self.areaRngLbl = ['all', 'small', 'medium', 'large']
         self.iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
@@ -197,7 +196,7 @@ class Evaluator():
             img_w = self.image_to_info[filename]['width']
 
             pred_voc = pred_yolo.copy()
-            pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5]/self.input_size)
+            pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
             pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=img_w, scale_h=img_h)
 
             for item in pred_voc:

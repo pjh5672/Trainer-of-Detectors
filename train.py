@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader, distributed
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tqdm import tqdm
 
-from dataloader import Dataset, build_transformer
+from dataloader import Dataset, build_transformer, transform_square_image
 from models import YOLOv3_Model
 from loss_function import YOLOv3_Loss
 from utils import *
@@ -97,18 +97,15 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
         images = mini_batch[0].cuda(rank, non_blocking=True) 
         targets = mini_batch[1]
         filenames = mini_batch[2]
-
         predictions = model(images)
         losses = criterion(predictions, targets)
 
         for idx in range(len(filenames)):
             filename = filenames[idx]
             pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
-            pred_yolo = filter_obj_score(prediction=pred_yolo, 
-                                        conf_threshold=config['MIN_SCORE_THRESH'])
-            pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, 
-                                        iou_threshold=config['MIN_IOU_THRESH'], 
-                                        maxDets=config['MAX_DETS'])
+            pred_yolo[:, :4] = normalize_bbox_coords(bboxes=pred_yolo[:, :4], input_size=config['INPUT_SIZE'])
+            pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
+            pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'],  maxDets=config['MAX_DETS'])
             if len(pred_yolo) > 0:
                 detections.append((filename, pred_yolo))
 
@@ -116,7 +113,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
         for loss_name, loss_value in zip(loss_types, losses):
             loss_per_phase[f'{loss_name}'] += loss_value
             monitor_text += f'{loss_name}: {loss_value.item():.2f} '
-            
+
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
 
@@ -151,11 +148,17 @@ def main_work(rank, world_size, args, logger):
     class_list = data_item['NAMES']
     color_list = generate_random_color(num_colors=len(class_list))
     transformers = build_transformer(image_size=(input_size, input_size))
-    train_set = Dataset(data_path=args.data_path, phase='train', transformer=transformers['train'])
-    val_set = Dataset(data_path=args.data_path, phase='val', transformer=transformers['val'])
+    train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=transformers['train'])
+    val_set = Dataset(data_path=args.data_path, phase='val', rank=rank, time_created=TIMESTAMP, transformer=transformers['val'])
+    
+    if rank == 0:
+        logging.warning(f'{train_set.data_info}')
+        logging.warning(f'{val_set.data_info}')
+        print(f'{train_set.data_info}| {val_set.data_info}')
+
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config_item['LEARNING_RATE'])
+    optimizer = torch.optim.Adam(model.parameters(), lr=config_item['LEARNING_RATE'], weight_decay=config_item['WEIGHT_DECAY'])
     val_file = args.data_path.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, config=config_item)
@@ -213,7 +216,7 @@ def main_work(rank, world_size, args, logger):
             model.load_state_dict(ckpt, strict=True)
 
     #################################### Train Model ####################################
-    best_mAP = 0.01
+    best_mAP = args.init_score
     progress_bar = tqdm(range(1, config_item['NUM_EPOCHS']+1), ncols=200) if rank == 0 else range(1, config_item['NUM_EPOCHS']+1)
 
     for epoch in progress_bar:
@@ -257,6 +260,7 @@ def main():
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
     parser.add_argument('--gpu_ids', type=int, help='List of GPU IDs', default=[0], nargs='+')
     parser.add_argument('--img_log_interval', type=int, default=5, help='Image logging interval')
+    parser.add_argument('--init_score', type=float, default=0.1, help='initial mAP score for update best model')
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
     args.config_path = ROOT / args.config_path

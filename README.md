@@ -22,6 +22,7 @@ This is repository for source code to train various object detection models.  cu
 
 | Date | Content |
 |:----:|:-----|
+| 08-03 | fix:code refactoring (del redundant functions) |
 | 08-02 | add:code integration of YOLOv3 trainer supporting Linux(Multi-GPUs) & Windows(Single-GPU) |
 | 08-01 | add:torch DistributedDataParallel(DDP) model train function on multi-GPUs |
 | 07-30 | fix:loss function, mAP calculate error debug when validation mode |

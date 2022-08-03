@@ -11,4 +11,4 @@ from .process import *
 from .visualize import *
 from .eval import Evaluator
 from .log import setup_primary_logging, setup_worker_logging
-from .cache import CacheMaker
+from .cache import make_cache_file
