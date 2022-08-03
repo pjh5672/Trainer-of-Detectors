@@ -61,8 +61,7 @@ class Dataset():
         class_ids, bboxes = self.get_label(index)
          
         if self.transformer:
-            if self.phase == 'val':
-                image = transform_square_image(image)
+            image = transform_square_image(image)
             transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             image = transformed_data['image']
             bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)

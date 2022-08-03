@@ -1,12 +1,11 @@
 # <div align="center">Object Detector Trainer</div>
 
-## <div align="center">Description</div>
+## Description
 
 This is repository for source code to train various object detection models.  currently, It supports YOLOv3 model training with Darknet53(You can download darknet53 weight from [here](https://drive.google.com/file/d/1VuV0llnEPUGiPq-cKhfSQlKQ7Zg6jlp9/view?usp=sharing))
 **Prototyping now...**
 
-**COCO2017 Average Precision at IoU=0.5 (AP50)**
-
+**COCO2017 Average Precision**
 | Model | size<sup>(pixels) | mAP<sup>0.5:0.95 | mAP<sup>0.5 |
 | :---: | :---: | :---: | :---: | 
 | YOLOv3 (paper) | 320 | 28.7 | 51.8 |
@@ -15,7 +14,7 @@ This is repository for source code to train various object detection models.  cu
 | YOLOv3 (paper) | 608 | 33.1 | 58.2 |
 
 
-## <div align="center">Updates</div>
+## Update
 
 <details>
     <summary><b> Timeline in 2022 </b></summary>
@@ -35,7 +34,7 @@ This is repository for source code to train various object detection models.  cu
 
 </details>
 
-## <div align="center">Contact</div>
+## Contact
 
 - Author: Jiho Park  
 - Email: pjh5672.dev@gmail.com  
