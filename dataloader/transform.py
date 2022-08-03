@@ -24,18 +24,3 @@ def build_transformer(image_size=(416, 416)):
         bbox_params=album.BboxParams(format='yolo', label_fields=['class_ids']),
     )
     return transformers
-
-
-def transform_square_image(image, pad_const=127):
-    pad_h, pad_w = 0, 0
-    img_h, img_w, img_c = image.shape
-    longest = max(img_h, img_w)
-
-    if img_h < longest:
-        pad_h = longest - img_h
-    if img_w < longest:
-        pad_w = longest - img_w
-
-    square_image = np.ones(shape=(img_h+pad_h, img_w+pad_w, img_c), dtype=image.dtype) * pad_const
-    square_image[:img_h, :img_w, :] = image
-    return square_image

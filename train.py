@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader, distributed
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tqdm import tqdm
 
-from dataloader import Dataset, build_transformer, transform_square_image
+from dataloader import Dataset, build_transformer
 from models import YOLOv3_Model
 from loss_function import YOLOv3_Loss
 from utils import *

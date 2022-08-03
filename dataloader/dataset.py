@@ -15,7 +15,7 @@ ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from transform import build_transformer, transform_square_image
+from transform import *
 from utils import *
 
 
@@ -61,7 +61,6 @@ class Dataset():
         class_ids, bboxes = self.get_label(index)
          
         if self.transformer:
-            image = transform_square_image(image)
             transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             image = transformed_data['image']
             bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)
