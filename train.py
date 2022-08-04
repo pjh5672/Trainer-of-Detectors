@@ -186,7 +186,7 @@ def main_work(rank, world_size, args, logger):
                             shuffle=False, num_workers=world_size*4, pin_memory=True, sampler=val_sampler)
 
     ################################### Calculate BPR ####################################
-    dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=200, leave=False) if rank == 0 else train_loader
+    dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=100, leave=False) if rank == 0 else train_loader
     PBR_params = [input_size, criterion.num_anchor_per_scale, criterion.anchors, criterion.strides]
     total_n_train, total_n_target = check_best_possible_recall(dataloader, PBR_params, config_item['ANCHOR_IOU_THRESHOLD'])
     
@@ -228,14 +228,14 @@ def main_work(rank, world_size, args, logger):
 
     #################################### Train Model ####################################
     best_mAP = args.init_score
-    progress_bar = tqdm(range(1, config_item['NUM_EPOCHS']+1), ncols=200) if rank == 0 else range(1, config_item['NUM_EPOCHS']+1)
+    progress_bar = tqdm(range(1, config_item['NUM_EPOCHS']+1), ncols=100) if rank == 0 else range(1, config_item['NUM_EPOCHS']+1)
 
     for epoch in progress_bar:
         if rank == 0:
             message = f'[Epoch:{epoch:03d}/{len(progress_bar):03d}]'
             progress_bar.set_description(desc=message)
-            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=200, leave=False)
-            val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=200, leave=False)
+            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=100, leave=False)
+            val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=100, leave=False)
             
         train_loss = execute_train(rank=rank, dataloader=train_loader, model=model, criterion=criterion, optimizer=optimizer)
         val_loss, gather_objects, canvas = execute_val(rank=rank, world_size=world_size, 

@@ -43,7 +43,7 @@ class Dataset():
         if phase == 'val':
             self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase, rank=rank)
         if rank == 0:
-            data_path = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=200)
+            data_path = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=100)
         else:
             data_path = zip(self.image_paths, self.label_paths)
 
