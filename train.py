@@ -155,7 +155,7 @@ def main_work(rank, world_size, args, logger):
                         rank=rank, 
                         time_created=TIMESTAMP, 
                         transformer=transformers['train'], 
-                        augment_strong=transformers['augment_strong'])
+                        augment_infos=(transformers['input_size'], transformers['augment_strong']))
     val_set = Dataset(data_path=args.data_path, 
                      phase='val', 
                      rank=rank, 

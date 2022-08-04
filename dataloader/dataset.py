@@ -21,7 +21,7 @@ from utils import *
 
 
 class Dataset():
-    def __init__(self, data_path, phase, rank, time_created, transformer=None, augment_strong=None):
+    def __init__(self, data_path, phase, rank, time_created, transformer=None, augment_infos=None):
         with open(data_path) as f:
             data_item = yaml.load(f, Loader=yaml.FullLoader)
         
@@ -50,8 +50,11 @@ class Dataset():
         cache, self.data_info = make_cache_file(cache_dir=cache_dir, file_name=save_name, phase=phase, 
                                                 data_path=data_path, time_created=time_created)
         assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files" 
+        
+        if augment_infos is not None:
+            self.input_size, self.augment_strong = augment_infos
         self.transformer = transformer
-        self.augment_strong = augment_strong
+
 
     def __len__(self): return len(self.image_paths)
     
@@ -68,7 +71,10 @@ class Dataset():
             try:
                 transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             except:
-                image = cv2.resize(image, dsize=(0,0), fx=(1+self.augment_strong), fy=(1+self.augment_strong))
+                img_h, img_w = image.shape[:2]
+                fx = self.input_size[1]*(1.0+self.augment_strong) / img_w
+                fy = self.input_size[0]*(1.0+self.augment_strong) / img_h
+                image = cv2.resize(image, dsize=(0,0), fx=fx, fy=fy)
                 transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             
             image = transformed_data['image']

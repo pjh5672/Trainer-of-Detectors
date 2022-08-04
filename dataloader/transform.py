@@ -12,7 +12,7 @@ def build_transformer(input_size=(416, 416), augment_strong=0):
     transformers = {}
     transformers['train'] = album.Compose([
         album.HorizontalFlip(p=0.5),
-        album.RandomSizedCrop(min_max_height=[input_h-int(input_h*augment_strong), input_h+int(input_h*augment_strong)], 
+        album.RandomSizedCrop(min_max_height=[int(input_h*(1.0-augment_strong)), int(input_h*(1.0+augment_strong))], 
                                 height=input_h, width=input_w, w2h_ratio=1.0, p=1.0),
         album.ShiftScaleRotate(rotate_limit=initial_rotate*augment_strong, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), p=1.0),
         album.RGBShift(r_shift_limit=initial_color_shift*augment_strong, 
@@ -29,6 +29,7 @@ def build_transformer(input_size=(416, 416), augment_strong=0):
         ToTensorV2()],
         bbox_params=album.BboxParams(format='yolo', label_fields=['class_ids']),
     )
+    transformers['input_size'] = input_size
     transformers['augment_strong'] = augment_strong
     return transformers
 
