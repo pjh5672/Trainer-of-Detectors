@@ -52,13 +52,12 @@ def visualize(image, label, class_list, color_list, show_class=False, show_score
     return canvas
 
 
-def visualize_prediction(input_size, ori_size_info, tensor_image, prediction, class_list, color_list):
-    max_side, pad_h, pad_w = ori_size_info
+def visualize_prediction(tensor_image, prediction, class_list, color_list):
+    pred_yolo= prediction[1]
+    input_size = tensor_image.shape[-1]
     canvas = denormalize(tensor_image)
-    pred_voc = prediction.copy()
-    pred_voc[:, 1:5][:,[0,2]] *= (max_side/img_w)
-    pred_voc[:, 1:5][:,[1,3]] *= (max_side/img_h)
+    pred_voc = pred_yolo.copy()
     pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
     pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
     canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)
-    return canvas
+    return canvas[...,::-1]

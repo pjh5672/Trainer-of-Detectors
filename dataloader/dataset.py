@@ -21,7 +21,7 @@ from utils import *
 
 
 class Dataset():
-    def __init__(self, data_path, phase, rank, time_created, transformer=None):
+    def __init__(self, data_path, phase, rank, time_created, transformer=None, augment_strong=None):
         with open(data_path) as f:
             data_item = yaml.load(f, Loader=yaml.FullLoader)
         
@@ -51,7 +51,7 @@ class Dataset():
                                                 data_path=data_path, time_created=time_created)
         assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files" 
         self.transformer = transformer
-
+        self.augment_strong = augment_strong
 
     def __len__(self): return len(self.image_paths)
     
@@ -62,9 +62,15 @@ class Dataset():
         class_ids, bboxes = self.get_label(index)
 
         if self.transformer:
-            image, bboxes, (max_side, pad_h, pad_w) = transform_square_image(image, bboxes)
+            image, bboxes, max_side = transform_square_image(image, bboxes)
             bboxes = clip_box_coordinates(bboxes)
-            transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
+            
+            try:
+                transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
+            except:
+                image = cv2.resize(image, dsize=(0,0), fx=(1+self.augment_strong), fy=(1+self.augment_strong))
+                transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
+            
             image = transformed_data['image']
             bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)
             class_ids = np.array(transformed_data['class_ids'], dtype=np.float32)
@@ -74,9 +80,9 @@ class Dataset():
                 bboxes = np.array([[0.5, 0.5, 1., 1.]], dtype=np.float32)
             
         target = np.concatenate((class_ids[:, np.newaxis], bboxes), axis=1)
-        return image, target, filename, (max_side, pad_h, pad_w)
+        return image, target, filename, max_side
     
-    
+
     def replace_image2label_paths(self, image_paths):
         sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels{os.sep}'
         return [sb.join(x.rsplit(sa, 1)).rsplit('.', 1)[0] + '.txt' for x in image_paths]
@@ -173,15 +179,15 @@ class Dataset():
         images = []
         targets = []
         filenames = []
-        ori_size_infos = []
+        max_sides = []
         
-        for image, target, filename, ori_size_info in mini_batch:
+        for image, target, filename, max_side in mini_batch:
             images.append(image)
             targets.append(target)
             filenames.append(filename)
-            ori_size_infos.append(ori_size_info)
+            max_sides.append(max_side)
         
-        return torch.stack(images, dim=0), targets, filenames, ori_size_infos
+        return torch.stack(images, dim=0), targets, filenames, max_sides
 
 
 
@@ -206,7 +212,7 @@ if __name__ == '__main__':
                 images = minibatch[0]
                 targets = minibatch[1]
                 filenames = minibatch[2]
-                ori_size_infos = minibatch[3]
+                max_sides = minibatch[3]
     
                 if index % 30 == 0:
-                    print(f"{phase} - {index}/{len(dataloaders[phase])} - {ori_size_infos}")
+                    print(f"{phase} - {index}/{len(dataloaders[phase])} - {max_sides}")

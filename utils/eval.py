@@ -190,11 +190,10 @@ class Evaluator():
         new_predictions = []
 
         for prediction in predictions:
-            filename, pred_yolo, ori_size_info = prediction
+            filename, pred_yolo, max_side = prediction
             img_id = self.image_to_info[filename]['image_id']
             img_h = self.image_to_info[filename]['height']
             img_w = self.image_to_info[filename]['width']
-            max_side, pad_h, pad_w = ori_size_info
 
             pred_voc = pred_yolo.copy()
             pred_voc[:, 1:5][:,[0,2]] *= (max_side/img_w)

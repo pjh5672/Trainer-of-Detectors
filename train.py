@@ -93,24 +93,24 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
     for index, mini_batch in enumerate(dataloader):
         if index == 0:
             canvas = mini_batch[0][0]
-
         images = mini_batch[0].cuda(rank, non_blocking=True) 
         targets = mini_batch[1]
         filenames = mini_batch[2]
-        ori_size_infos = minibatch[3]
+        max_sides = mini_batch[3]
 
         predictions = model(images)
         losses = criterion(predictions, targets)
 
         for idx in range(len(filenames)):
             filename = filenames[idx]
-            ori_size_info = ori_size_infos[idx]
+            max_side = max_sides[idx]
             pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
             pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
             pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
-            pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'],  maxDets=config['MAX_DETS'])
+            pred_yolo = run_NMS_for_yolo(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'])
+            
             if len(pred_yolo) > 0:
-                detections.append((filename, pred_yolo, ori_size_info))
+                detections.append((filename, pred_yolo, max_side))
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
@@ -129,8 +129,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
-    filename, pred_yolo, ori_size_info = detections[0]
-    canvas = visualize_prediction(config['INPUT_SIZE'], ori_size_info, canvas, pred_yolo, class_list, color_list)
+    canvas = visualize_prediction(canvas, detections[0], class_list, color_list)
     del mini_batch, losses
     torch.cuda.empty_cache()
     return loss_per_phase, gather_objects, canvas
@@ -150,9 +149,18 @@ def main_work(rank, world_size, args, logger):
     input_size = config_item['INPUT_SIZE']
     class_list = data_item['NAMES']
     color_list = generate_random_color(num_colors=len(class_list))
-    transformers = build_transformer(input_size=(input_size, input_size))
-    train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=transformers['train'])
-    val_set = Dataset(data_path=args.data_path, phase='val', rank=rank, time_created=TIMESTAMP, transformer=transformers['val'])
+    transformers = build_transformer(input_size=(input_size, input_size), augment_strong=config_item['AUGMENT_STRONG'])
+    train_set = Dataset(data_path=args.data_path, 
+                        phase='train', 
+                        rank=rank, 
+                        time_created=TIMESTAMP, 
+                        transformer=transformers['train'], 
+                        augment_strong=transformers['augment_strong'])
+    val_set = Dataset(data_path=args.data_path, 
+                     phase='val', 
+                     rank=rank, 
+                     time_created=TIMESTAMP, 
+                     transformer=transformers['val'])
     
     if rank == 0:
         logging.warning(f'{train_set.data_info}')
@@ -262,7 +270,7 @@ def main():
     parser.add_argument('--config_path', type=str, default='config/yolov3.yml', help='Path to config.yml file')
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
     parser.add_argument('--gpu_ids', type=int, help='List of GPU IDs', default=[0], nargs='+')
-    parser.add_argument('--img_log_interval', type=int, default=5, help='Image logging interval')
+    parser.add_argument('--img_log_interval', type=int, default=1, help='Image logging interval')
     parser.add_argument('--init_score', type=float, default=0.1, help='initial mAP score for update best model')
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
