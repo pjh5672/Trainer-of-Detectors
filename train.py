@@ -11,6 +11,7 @@ from collections import defaultdict
 import cv2
 import yaml
 import torch
+import torch.optim as optim
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.backends.cudnn as cudnn
@@ -129,7 +130,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
-    canvas = visualize_prediction(canvas, detections[0], class_list, color_list)
+    canvas = visualize_prediction(canvas, detections[0], config['MIN_SCORE_THRESH_FOR_IMAGING'], class_list, color_list)
     del mini_batch, losses
     torch.cuda.empty_cache()
     return loss_per_phase, gather_objects, canvas
@@ -150,17 +151,9 @@ def main_work(rank, world_size, args, logger):
     class_list = data_item['NAMES']
     color_list = generate_random_color(num_colors=len(class_list))
     transformers = build_transformer(input_size=(input_size, input_size), augment_strong=config_item['AUGMENT_STRONG'])
-    train_set = Dataset(data_path=args.data_path, 
-                        phase='train', 
-                        rank=rank, 
-                        time_created=TIMESTAMP, 
-                        transformer=transformers['train'], 
+    train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=transformers['train'], 
                         augment_infos=(transformers['input_size'], transformers['augment_strong']))
-    val_set = Dataset(data_path=args.data_path, 
-                     phase='val', 
-                     rank=rank, 
-                     time_created=TIMESTAMP, 
-                     transformer=transformers['val'])
+    val_set = Dataset(data_path=args.data_path, phase='val',  rank=rank, time_created=TIMESTAMP, transformer=transformers['val'])
     
     if rank == 0:
         logging.warning(f'{train_set.data_info}')
@@ -169,12 +162,12 @@ def main_work(rank, world_size, args, logger):
 
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
-    optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), 
+    optimizer = optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), 
                                  lr=config_item['LEARNING_RATE'], weight_decay=config_item['WEIGHT_DECAY'])
     val_file = args.data_path.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, config=config_item)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=config_item['LR_ADJUST_EPOCH'], gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=config_item['LR_ADJUST_EPOCH'], gamma=0.1)
     
     ################################### Init Process ###################################
     setup(rank, world_size)
@@ -200,8 +193,6 @@ def main_work(rank, world_size, args, logger):
             dist.all_reduce(total_n_target, op=dist.ReduceOp.SUM)
 
         if rank == 0:
-            message = f'Input Size: {input_size}'
-            logging.warning(message)
             message = f'Best Possible Rate: {total_n_train/total_n_target:0.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}\n'
             logging.warning(message)
         del dataloader
