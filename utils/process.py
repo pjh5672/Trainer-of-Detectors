@@ -30,8 +30,10 @@ def run_NMS_for_yolo(prediction, iou_threshold=0.5, maxDets=100):
     while len(order) > 0:
         i = order[0]
         pick.append(i)
+
         if len(order) == 1:
             break
+            
         xx1 = np.maximum(x1[i], x1[order[1:]])
         yy1 = np.maximum(y1[i], y1[order[1:]])
         xx2 = np.minimum(x2[i], x2[order[1:]])

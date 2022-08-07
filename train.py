@@ -169,10 +169,12 @@ def main_work(rank, world_size, args, logger):
 
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config_item['LEARNING_RATE'], weight_decay=config_item['WEIGHT_DECAY'])
+    optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), 
+                                 lr=config_item['LEARNING_RATE'], weight_decay=config_item['WEIGHT_DECAY'])
     val_file = args.data_path.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, config=config_item)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=config_item['LR_ADJUST_EPOCH'], gamma=0.1)
     
     ################################### Init Process ###################################
     setup(rank, world_size)
@@ -186,23 +188,23 @@ def main_work(rank, world_size, args, logger):
                             shuffle=False, num_workers=world_size*4, pin_memory=True, sampler=val_sampler)
 
     ################################### Calculate BPR ####################################
-    dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=100, leave=False) if rank == 0 else train_loader
-    PBR_params = [input_size, criterion.num_anchor_per_scale, criterion.anchors, criterion.strides]
-    total_n_train, total_n_target = check_best_possible_recall(dataloader, PBR_params, config_item['ANCHOR_IOU_THRESHOLD'])
-    
-    if OS_SYSTEM == 'Linux':
-        total_n_train = torch.tensor(total_n_train).cuda(rank)
-        total_n_target = torch.tensor(total_n_target).cuda(rank)
-        dist.all_reduce(total_n_train, op=dist.ReduceOp.SUM)
-        dist.all_reduce(total_n_target, op=dist.ReduceOp.SUM)
+    if config_item['GET_PBR']:
+        dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=100, leave=False) if rank == 0 else train_loader
+        PBR_params = [input_size, criterion.num_anchor_per_scale, criterion.anchors, criterion.strides]
+        total_n_train, total_n_target = check_best_possible_recall(dataloader, PBR_params, config_item['ANCHOR_IOU_THRESHOLD'])
+        
+        if OS_SYSTEM == 'Linux':
+            total_n_train = torch.tensor(total_n_train).cuda(rank)
+            total_n_target = torch.tensor(total_n_target).cuda(rank)
+            dist.all_reduce(total_n_train, op=dist.ReduceOp.SUM)
+            dist.all_reduce(total_n_target, op=dist.ReduceOp.SUM)
 
-    if rank == 0:
-        message = f'Input Size: {input_size}'
-        logging.warning(message)
-        message = f'Best Possible Rate: {total_n_train/total_n_target:0.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}\n'
-        logging.warning(message)
-
-    del dataloader
+        if rank == 0:
+            message = f'Input Size: {input_size}'
+            logging.warning(message)
+            message = f'Best Possible Rate: {total_n_train/total_n_target:0.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}\n'
+            logging.warning(message)
+        del dataloader
 
     #################################### Init Model ####################################
     torch.manual_seed(2023)
@@ -242,6 +244,7 @@ def main_work(rank, world_size, args, logger):
                                                         config=config_item, dataloader=val_loader,
                                                         model=model, criterion=criterion, evaluator=evaluator, 
                                                         class_list=class_list, color_list=color_list)
+        scheduler.step()
 
         if rank == 0:
             monitor_text = f' Train Loss: {train_loss["total"]/world_size:.2f}, Val Loss: {val_loss["total"]/world_size:.2f}'
