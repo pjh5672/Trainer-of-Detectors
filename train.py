@@ -48,12 +48,16 @@ def cleanup():
         dist.destroy_process_group()
     
 
-def execute_train(rank, dataloader, model, criterion, optimizer):
+def execute_train(rank, dataloader, model, criterion, optimizer, class_list, color_list):
     loss_per_phase = defaultdict(float)
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
     model.train()
 
     for index, mini_batch in enumerate(dataloader):
+        if (rank == 0) and (index == 0):
+            canvas_img = mini_batch[0][0]
+            canvas_gt = mini_batch[1][0]
+
         images = mini_batch[0].cuda(rank, non_blocking=True) 
         targets = mini_batch[1]
         filenames = mini_batch[2]
@@ -78,9 +82,14 @@ def execute_train(rank, dataloader, model, criterion, optimizer):
         if OS_SYSTEM == 'Linux':
             dist.all_reduce(loss_per_phase[loss_name], op=dist.ReduceOp.SUM)
 
-    del mini_batch, losses
+    if rank == 0:
+        canvas = visualize_target(canvas_img, canvas_gt, class_list, color_list)
+    else:
+        canvas = None
+
+    del mini_batch, images, predictions, losses
     torch.cuda.empty_cache()
-    return loss_per_phase
+    return loss_per_phase, canvas
     
 
 @torch.no_grad()
@@ -108,7 +117,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
             pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
             pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
             pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
-            pred_yolo = run_NMS_for_YOLO(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], multi_label=True, maxDets=config['MAX_DETS'])
+            pred_yolo = run_NMS_for_YOLO(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'])
             
             if len(pred_yolo) > 0:
                 detections.append((filename, pred_yolo, max_side))
@@ -130,8 +139,13 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
+    if rank == 0:
+        canvas = visualize_prediction(canvas_img, canvas_pred, config['MIN_SCORE_THRESH_FOR_IMAGING'], class_list, color_list)
+    else:
+        canvas = None
+
     canvas = visualize_prediction(canvas, detections[0], config['MIN_SCORE_THRESH_FOR_IMAGING'], class_list, color_list)
-    del mini_batch, losses
+    del mini_batch, images, predictions, losses
     torch.cuda.empty_cache()
     return loss_per_phase, gather_objects, canvas
 
@@ -230,11 +244,12 @@ def main_work(rank, world_size, args, logger):
             train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=100, leave=False)
             val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=100, leave=False)
             
-        train_loss = execute_train(rank=rank, dataloader=train_loader, model=model, criterion=criterion, optimizer=optimizer)
-        val_loss, gather_objects, canvas = execute_val(rank=rank, world_size=world_size, 
-                                                        config=config_item, dataloader=val_loader,
-                                                        model=model, criterion=criterion, evaluator=evaluator, 
-                                                        class_list=class_list, color_list=color_list)
+        train_loss, canvas_train = execute_train(rank=rank, dataloader=train_loader, model=model, criterion=criterion, 
+                                                optimizer=optimizer, class_list=class_list, color_list=color_list)
+        val_loss, gather_objects, canvas_val = execute_val(rank=rank, world_size=world_size, 
+                                                            config=config_item, dataloader=val_loader,
+                                                            model=model, criterion=criterion, evaluator=evaluator, 
+                                                            class_list=class_list, color_list=color_list)
         scheduler.step()
 
         if rank == 0:
@@ -254,7 +269,9 @@ def main_work(rank, world_size, args, logger):
                             model_name=f'{TIMESTAMP}-EP{epoch:02d}.pth')                    
 
             if epoch % args.img_log_interval == 0:
-                imwrite(str(args.exp_path / 'images' / f'{TIMESTAMP}-EP{epoch:02d}.jpg'), canvas)
+                imwrite(str(args.exp_path / 'images' / 'train' / f'{TIMESTAMP}-EP{epoch:02d}.jpg'), canvas_train)
+                imwrite(str(args.exp_path / 'images' / 'val' / f'{TIMESTAMP}-EP{epoch:02d}.jpg'), canvas_val)
+
     cleanup()
 
 
@@ -270,8 +287,9 @@ def main():
     args.data_path = ROOT / args.data_path
     args.config_path = ROOT / args.config_path
     args.exp_path = ROOT / 'experiments' / args.exp_name
-    os.makedirs(args.exp_path / 'images', exist_ok=True)
     os.makedirs(args.exp_path / 'logs', exist_ok=True)
+    os.makedirs(args.exp_path / 'images' / 'train', exist_ok=True)
+    os.makedirs(args.exp_path / 'images' / 'val', exist_ok=True)
     world_size = len(args.gpu_ids)
     assert world_size > 0, 'Executable GPU machine does not exist, This training supports on CUDA available environment.'
 

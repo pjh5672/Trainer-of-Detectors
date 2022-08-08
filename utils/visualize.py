@@ -53,11 +53,22 @@ def visualize(image, label, class_list, color_list, show_class=False, show_score
 
 
 def visualize_prediction(tensor_image, prediction, conf_threshold, class_list, color_list):
-    pred_yolo= prediction[1]
+    pred_yolo = prediction[1]
     input_size = tensor_image.shape[-1]
     canvas = denormalize(tensor_image)
     pred_voc = pred_yolo[pred_yolo[:, 5] >= conf_threshold].copy()
     pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
     pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
     canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)
+    return canvas[...,::-1]
+
+
+
+def visualize_target(tensor_image, target, class_list, color_list):
+    input_size = tensor_image.shape[-1]
+    canvas = denormalize(tensor_image)
+    target_voc = target.copy()
+    target_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(target_voc[:, 1:5])
+    target_voc[:, 1:5] = scale_to_original(target_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
+    canvas = visualize(canvas, target_voc, class_list, color_list, show_class=True, show_score=False)
     return canvas[...,::-1]

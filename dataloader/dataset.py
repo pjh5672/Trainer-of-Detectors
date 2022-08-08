@@ -67,15 +67,7 @@ class Dataset():
         if self.transformer:
             image, bboxes, max_side = transform_square_image(image, bboxes)
             bboxes = clip_box_coordinates(bboxes)
-            
-            try:
-                transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
-            except:
-                img_h, img_w = image.shape[:2]
-                fx = self.input_size[1]*(1.0+self.augment_strong) / img_w
-                fy = self.input_size[0]*(1.0+self.augment_strong) / img_h
-                image = cv2.resize(image, dsize=(0,0), fx=fx, fy=fy)
-                transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
+            transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
             
             image = transformed_data['image']
             bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)

@@ -9,8 +9,7 @@ def filter_obj_score(prediction, conf_threshold=0.01):
     return np.concatenate([class_ids[:, np.newaxis], bboxes, conf_scores[:, np.newaxis]], axis=-1)
 
 
-def run_NMS_for_YOLO(prediction, iou_threshold=0.5, multi_label=False, maxDets=100):
-    cls_ids = prediction[:, 0]
+def run_NMS_for_YOLO(prediction, iou_threshold=0.5, maxDets=100):
     bboxes = prediction[:, 1:5] * 100
     scores = prediction[:, 5]
 
