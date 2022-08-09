@@ -21,6 +21,7 @@ This is repository for source code to train various object detection models.  cu
 
 | Date | Content |
 |:----:|:-----|
+| 08-09 | fix:mAP calculation optimization x150 speed up and process await delay reduction with DDP training |
 | 08-07 | add:learning rate scheduler (160 epochs with starting inital lr:0.001, dividing it by 10 at 30, 60 epochs) |
 | 08-04 | fix:code refactoring (visualizer for prediction of letter box) |
 | 08-03 | fix:code refactoring (del redundant functions) |

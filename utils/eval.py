@@ -13,28 +13,42 @@ class Evaluator():
 
         self.image_to_info = {}
         for item in GT_data['images']:
-            self.image_to_info[item['filename']] = {'image_id': item['id'],
-                                                    'height': item['height'],
+            self.image_to_info[item['filename']] = {'image_id': item['id'], 
+                                                    'height': item['height'], 
                                                     'width': item['width']}
         self.maxDets = config['MAX_DETS']
         self.areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
         self.areaRngLbl = ['all', 'small', 'medium', 'large']
         self.iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
-        self.classes_index = list(map(int, GT_data['categories'].keys()))
         self.groundtruths = self.split_areaRng(GT_data['annotations'])
+
+        self.annos_per_image_id_per_class_id_per_area = {}
+        self.annos_class_index_per_area = {}
+        for areaLbl in self.areaRngLbl:
+            groundtruths = self.groundtruths[areaLbl]
+            annos_per_class_id = defaultdict(list)
+            for ann in groundtruths:
+                annos_per_class_id[ann['class_id']].append(ann)
+            if -1 in annos_per_class_id.keys():
+                del annos_per_class_id[-1]
+            annos_per_image_id_per_class_id = {}
+            for class_id in annos_per_class_id.keys():
+                annos_per_image_id = defaultdict(list)
+                for ann in annos_per_class_id[class_id]:
+                    annos_per_image_id[ann['image_id']].append(ann)
+                annos_per_image_id_per_class_id[class_id] = annos_per_image_id
+            self.annos_per_image_id_per_class_id_per_area[areaLbl] = annos_per_image_id_per_class_id
+            self.annos_class_index_per_area[areaLbl] = list(annos_per_class_id.keys())
 
 
     def __call__(self, predictions):
-        all_preds_dict = self.transform_pred_format(predictions)
-        detections = self.split_areaRng(all_preds_dict)
-
+        detections = self.split_areaRng(self.transform_pred_format(predictions))
         mAP_info = {}
         for areaLbl in self.areaRngLbl:
             AP_info_per_class = []
-            for c in self.classes_index:
-                res = self.calculate_AP_single_class(groundtruths=self.groundtruths[areaLbl],
-                                                     detections=detections[areaLbl],
-                                                     class_id=c)
+            groundtruths = self.annos_per_image_id_per_class_id_per_area[areaLbl]
+            for c in self.annos_class_index_per_area[areaLbl]:
+                res = self.calculate_AP_single_class(groundtruths=groundtruths, detections=detections[areaLbl], class_id=c)
                 AP_info_per_class.append(res)
             mAP_info[areaLbl] = self.calculate_mAP(AP_info_per_class)
         
@@ -43,12 +57,12 @@ class Evaluator():
             if areaLbl == 'all':
                 eval_text += self.summarize(mAP_info[areaLbl]['mAP05095'], iouThr=None, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
-                eval_text += self.summarize(mAP_info[areaLbl]['mAP05'], iouThr=0.5, areaLbl=areaLbl, maxDets=self.maxDets)
+                eval_text += self.summarize(mAP_info[areaLbl]['mAP050'], iouThr=0.5, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
                 eval_text += self.summarize(mAP_info[areaLbl]['mAP075'], iouThr=0.75, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
             else:
-                eval_text += self.summarize(mAP_info[areaLbl]['mAP05'], iouThr=0.5, areaLbl=areaLbl, maxDets=self.maxDets)
+                eval_text += self.summarize(mAP_info[areaLbl]['mAP050'], iouThr=0.5, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
         return mAP_info, eval_text
 
@@ -62,81 +76,77 @@ class Evaluator():
 
 
     def calculate_mAP(self, AP_info_per_class):
-        AP05_per_class = {}
+        AP050_per_class = {}
         num_positives_per_class, num_TP_per_class, num_FP_per_class = {}, {}, {}
-        mAP05, mAP075, mAP05095 = 0, 0, 0
+        mAP050, mAP075, mAP05095 = 0, 0, 0
         valid_num_classes = 1e-10
 
         for res in AP_info_per_class:
             if res['total_positives'] > 0:
                 valid_num_classes += 1 
-                AP05_per_class[res['class']] = res['AP05']
+                AP050_per_class[res['class']] = res['AP050']
                 num_positives_per_class[res['class']] = res['total_positives']
                 num_TP_per_class[res['class']] = res['total_TP']
                 num_FP_per_class[res['class']] = res['total_FP']
-                mAP05 += res['AP05']
+                mAP050 += res['AP050']
                 mAP075 += res['AP075']
                 mAP05095 += res['AP05095']
-        mAP05 /= valid_num_classes
+        mAP050 /= valid_num_classes
         mAP075 /= valid_num_classes
         mAP05095 /= valid_num_classes
 
-        res = {
-            'AP05_PER_CLASS': AP05_per_class,
-            'num_positives_per_class': num_positives_per_class,
-            'num_TP_per_class': num_TP_per_class,
-            'num_FP_per_class': num_FP_per_class,
-            'mAP05': mAP05,
-            'mAP075': mAP075,
-            'mAP05095': mAP05095,
-        }
+        res = {'AP050_PER_CLASS': AP050_per_class,
+                'num_positives_per_class': num_positives_per_class,
+                'num_TP_per_class': num_TP_per_class,
+                'num_FP_per_class': num_FP_per_class,
+                'mAP050': mAP050,
+                'mAP075': mAP075,
+                'mAP05095': mAP05095}
         return res
 
 
     def calculate_AP_single_class(self, groundtruths, detections, class_id):
-        GTs_per_class = [g for g in groundtruths if g['class_id'] == class_id]
+        annos_per_class = groundtruths[class_id]
         preds_per_class = [d for d in detections if d['class_id'] == class_id]
         preds_per_class = sorted(preds_per_class, key=lambda x:x['confidence'], reverse=True)
 
-        num_true = len(GTs_per_class)
+        num_true = sum([len(annos_per_class[image_id]) for image_id in annos_per_class])
         num_positive = len(preds_per_class)
         TP = np.zeros(shape=(len(self.iouThrs), num_positive))
         FP = np.zeros(shape=(len(self.iouThrs), num_positive))
 
         if num_positive == 0:
-            res = {
-            'class': class_id,
-            'precision05': 0,
-            'recall05': 0,
-            'AP05': 0,
-            'AP075': 0,
-            'AP05095': 0,
-            'total_positives': num_positive,
-            'total_TP': np.sum(TP),
-            'total_FP': np.sum(FP)
-            }
+            res = {'class': class_id,
+                    'precision05': 0,
+                    'recall05': 0,
+                    'AP050': 0,
+                    'AP075': 0,
+                    'AP05095': 0,
+                    'total_positives': num_positive,
+                    'total_TP': np.sum(TP),
+                    'total_FP': np.sum(FP)}
             return res
 
-        flag_GTs_per_image = Counter(g['image_id'] for g in GTs_per_class)
-        for k, v in flag_GTs_per_image.items():
-            flag_GTs_per_image[k] = np.zeros(shape=(len(self.iouThrs), v))
+        flag_GT_per_image = {}
+        for image_id in annos_per_class:
+            flag_GT_per_image[image_id] = np.zeros(shape=(len(self.iouThrs), len(annos_per_class[image_id])))
 
         for i in range(len(preds_per_class)):
             pred_in_image = preds_per_class[i]
-            GT_in_image = [gt for gt in GTs_per_class if gt['image_id'] == pred_in_image['image_id']]
+            anno_in_image = annos_per_class[pred_in_image['image_id']]
 
             iou_max = 0
-            for j in range(len(GT_in_image)):
-                iou = self.get_IoU(pred_in_image['bbox'], GT_in_image[j]['bbox'])
+            for j in range(len(anno_in_image)):
+                iou = self.get_IoU(pred_in_image['bbox'], anno_in_image[j]['bbox'])
                 if iou > iou_max:
                     iou_max = iou
                     jmax = j
             
             for k in range(len(self.iouThrs)):
                 if iou_max >= self.iouThrs[k]:
-                    if flag_GTs_per_image[pred_in_image['image_id']][k, jmax] == 0:
+                    if flag_GT_per_image[pred_in_image['image_id']][k, jmax] == 0:
+                        flag_GT_per_image[pred_in_image['image_id']][k, jmax] = 1
                         TP[k, i] = 1
-                        flag_GTs_per_image[pred_in_image['image_id']][k, jmax] = 1
                     else:
                         FP[k, i] = 1
                 else:
@@ -150,22 +160,20 @@ class Evaluator():
         APs = []
         AP05095 = 0
         for idx in range(len(self.iouThrs)):
-            ap = self.calculate_average_precision(rec[idx], prec[idx])
+            ap = self.calculate_ElevenPointInterpolatedAP(rec[idx], prec[idx])
             APs.append(ap)
             AP05095 += (self.iouThrs[idx] * ap)
         AP05095 /= sum(self.iouThrs)
 
-        res = {
-            'class' : class_id,
-            'precision05' : list(prec[0].round(4)),
-            'recall05' : list(rec[0].round(4)),
-            'AP05' : APs[0],
-            'AP075' : APs[5],
-            'AP05095' : AP05095,
-            'total_positives' : num_positive,
-            'total_TP' : np.sum(TP),
-            'total_FP' : np.sum(FP)
-        }
+        res = {'class' : class_id,
+                'precision05' : list(prec[0].round(4)),
+                'recall05' : list(rec[0].round(4)),
+                'AP050' : APs[0],
+                'AP075' : APs[5],
+                'AP05095' : AP05095,
+                'total_positives' : num_positive,
+                'total_TP' : np.sum(TP),
+                'total_FP' : np.sum(FP)}
         return res
 
 
@@ -184,7 +192,6 @@ class Evaluator():
             elif self.areaRng[3][0] <= item['area'] < self.areaRng[3][1]:
                 items[self.areaRngLbl[3]].append(item)
         return items
-
 
     def transform_pred_format(self, predictions):
         new_predictions = []
@@ -210,7 +217,6 @@ class Evaluator():
                 pred_dict['confidence'] = float(item[5])
                 new_predictions.append(pred_dict)
         return new_predictions
-
 
     def is_intersect(self, boxA, boxB):
         if boxA[0] > boxB[2]:
@@ -243,19 +249,22 @@ class Evaluator():
         result = intersect / (union-intersect)
         return result
 
-    def calculate_average_precision(self, rec, prec):
-        mrec = [0] + [e for e in rec] + [1]
-        mpre = [0] + [e for e in prec] + [0]
+    def calculate_ElevenPointInterpolatedAP(self, rec, prec):
+        mrec = [e for e in rec]
+        mpre = [e for e in prec]
 
-        for i in range(len(mpre)-1, 0, -1):
-            mpre[i-1] = max(mpre[i-1], mpre[i])
+        recallValues = np.linspace(0, 1, 11)
+        recallValues = list(recallValues[::-1])
+        rhoInterp, recallValid = [], []
 
-        ii = []
-        for i in range(len(mrec)-1):
-            if mrec[1:][i] != mrec[0:-1][i]:
-                ii.append(i+1)
+        for r in recallValues:
+            argGreaterRecalls = np.argwhere(mrec[:] >= r)
+            pmax = 0
 
-        ap = 0
-        for i in ii:
-            ap += np.sum((mrec[i] - mrec[i-1]) * mpre[i])
+            if argGreaterRecalls.size != 0:
+                pmax = max(mpre[argGreaterRecalls.min():])
+
+            recallValid.append(r)
+            rhoInterp.append(pmax)
+        ap = sum(rhoInterp) / 11
         return ap

@@ -135,6 +135,7 @@ class YOLOv3_Loss():
                                 device=self.device, dtype=torch.float32)
 
         target_c = target[:, 0].long()
+        
         if (target_c == -1).any():
             obj_mask = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
                                    device=self.device, dtype=torch.uint8)

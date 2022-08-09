@@ -43,7 +43,7 @@ class Dataset():
         if phase == 'val':
             self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase, rank=rank)
         if rank == 0:
-            data_path = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=100)
+            data_path = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=120)
         else:
             data_path = zip(self.image_paths, self.label_paths)
 
@@ -131,14 +131,16 @@ class Dataset():
             eval_data['categories'] = {}
             eval_data['timestamp'] = datetime.today().strftime('%Y-%m-%d_%H:%M')
             
-            pbar = tqdm(range(len(self.label_paths)), ncols=200) if rank == 0 else range(len(self.label_paths))
+            pbar = tqdm(range(len(self.label_paths)), ncols=120) if rank == 0 else range(len(self.label_paths))
             img_id = 0
             anno_id = 0
             for index in pbar:
                 if rank == 0:
                     pbar.set_description(f'Generating [{phase.upper()}] GT file for mAP evaluation...')
+
                 filename, image = self.get_image(index)
                 class_ids, bboxes = self.get_label(index)
+                    
                 bboxes = clip_box_coordinates(bboxes)
                 bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
 
@@ -152,7 +154,7 @@ class Dataset():
                     lbl_dict['id'] = anno_id
                     lbl_dict['image_id'] = img_id
                     lbl_dict['bbox'] = [round(pt, 2) for pt in list(map(float, anno_bbox))]
-                    lbl_dict['area'] = round(float((anno_bbox[2]-anno_bbox[0])*(anno_bbox[3]-anno_bbox[1])),2)
+                    lbl_dict['area'] = round(float((anno_bbox[2]-anno_bbox[0]+1)*(anno_bbox[3]-anno_bbox[1]+1)),2)
                     lbl_dict['class_id'] = int(class_id)
                     eval_data['annotations'].append(lbl_dict)
                     anno_id += 1

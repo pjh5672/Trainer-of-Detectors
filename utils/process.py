@@ -13,7 +13,7 @@ def run_NMS_for_YOLO(prediction, iou_threshold=0.5, maxDets=100):
     bboxes = prediction[:, 1:5] * 100
     scores = prediction[:, 5]
 
-    if len(prediction) == 0:
+    if len(bboxes) == 0:
         return []
 
     if bboxes.dtype.kind == "i":

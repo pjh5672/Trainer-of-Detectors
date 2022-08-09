@@ -24,7 +24,6 @@ from models import YOLOv3_Model
 from loss_function import YOLOv3_Loss
 from utils import *
 
-
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]
 OS_SYSTEM = platform.system()
@@ -33,6 +32,7 @@ cudnn.benchmark = True
 
 assert OS_SYSTEM in ('Linux', 'Windows'), 'This is not supported on the Operating System.'
 
+import time
 
 
 def setup(rank, world_size):
@@ -74,6 +74,7 @@ def execute_train(rank, dataloader, model, criterion, optimizer, class_list, col
         for loss_name, loss_value in zip(loss_types, losses):
             loss_per_phase[f'{loss_name}'] += loss_value
             monitor_text += f'{loss_name}: {loss_value.item():.2f} '
+
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
     
@@ -102,7 +103,8 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
 
     for index, mini_batch in enumerate(dataloader):
         if index == 0:
-            canvas = mini_batch[0][0]
+            canvas_img = mini_batch[0][0]
+
         images = mini_batch[0].cuda(rank, non_blocking=True) 
         targets = mini_batch[1]
         filenames = mini_batch[2]
@@ -110,11 +112,12 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
 
         predictions = model(images)
         losses = criterion(predictions, targets)
+        predictions = torch.cat(predictions, dim=1)
 
         for idx in range(len(filenames)):
             filename = filenames[idx]
             max_side = max_sides[idx]
-            pred_yolo = torch.cat(predictions, dim=1)[idx].cpu().numpy()
+            pred_yolo = predictions[idx].cpu().numpy()
             pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
             pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
             pred_yolo = run_NMS_for_YOLO(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'])
@@ -134,17 +137,17 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
         loss_per_phase[loss_name] /= len(dataloader)
         if OS_SYSTEM == 'Linux':
             dist.all_reduce(loss_per_phase[loss_name], op=dist.ReduceOp.SUM)
+
     if OS_SYSTEM == 'Linux':
         dist.all_gather_object(gather_objects, detections)
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
     if rank == 0:
-        canvas = visualize_prediction(canvas_img, canvas_pred, config['MIN_SCORE_THRESH_FOR_IMAGING'], class_list, color_list)
+        canvas = visualize_prediction(canvas_img, detections[0], config['MIN_SCORE_THRESH_FOR_IMAGING'], class_list, color_list)
     else:
         canvas = None
 
-    canvas = visualize_prediction(canvas, detections[0], config['MIN_SCORE_THRESH_FOR_IMAGING'], class_list, color_list)
     del mini_batch, images, predictions, losses
     torch.cuda.empty_cache()
     return loss_per_phase, gather_objects, canvas
@@ -196,7 +199,7 @@ def main_work(rank, world_size, args, logger):
 
     ################################### Calculate BPR ####################################
     if config_item['GET_PBR']:
-        dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=100, leave=False) if rank == 0 else train_loader
+        dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=120, leave=False) if rank == 0 else train_loader
         PBR_params = [input_size, criterion.num_anchor_per_scale, criterion.anchors, criterion.strides]
         total_n_train, total_n_target = check_best_possible_recall(dataloader, PBR_params, config_item['ANCHOR_IOU_THRESHOLD'])
         
@@ -235,15 +238,16 @@ def main_work(rank, world_size, args, logger):
 
     #################################### Train Model ####################################
     best_mAP = args.init_score
-    progress_bar = tqdm(range(1, config_item['NUM_EPOCHS']+1), ncols=100) if rank == 0 else range(1, config_item['NUM_EPOCHS']+1)
+    progress_bar = tqdm(range(1, config_item['NUM_EPOCHS']+1), ncols=120) if rank == 0 else range(1, config_item['NUM_EPOCHS']+1)
 
     for epoch in progress_bar:
         if rank == 0:
             message = f'[Epoch:{epoch:03d}/{len(progress_bar):03d}]'
             progress_bar.set_description(desc=message)
-            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=100, leave=False)
-            val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=100, leave=False)
-            
+            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=120, leave=False)
+            val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=120, leave=False)
+        
+        train_sampler.set_epoch(epoch)
         train_loss, canvas_train = execute_train(rank=rank, dataloader=train_loader, model=model, criterion=criterion, 
                                                 optimizer=optimizer, class_list=class_list, color_list=color_list)
         val_loss, gather_objects, canvas_val = execute_val(rank=rank, world_size=world_size, 
@@ -261,17 +265,16 @@ def main_work(rank, world_size, args, logger):
             logging.warning(message + monitor_text)
             logging.warning(eval_text)
 
-            if mAP_info['all']['mAP05'] > best_mAP:
-                best_mAP = mAP_info['all']['mAP05']
+            if mAP_info['all']['mAP050'] > best_mAP:
+                best_mAP = mAP_info['all']['mAP050']
                 model_to_save = model.module if hasattr(model, 'module') else model
                 save_model(model=deepcopy(model_to_save).cpu(), 
                             save_path=args.exp_path / 'weights', 
-                            model_name=f'{TIMESTAMP}-EP{epoch:02d}.pth')                    
+                            model_name=f'{TIMESTAMP}-EP{epoch:02d}.pth')
 
             if epoch % args.img_log_interval == 0:
                 imwrite(str(args.exp_path / 'images' / 'train' / f'{TIMESTAMP}-EP{epoch:02d}.jpg'), canvas_train)
                 imwrite(str(args.exp_path / 'images' / 'val' / f'{TIMESTAMP}-EP{epoch:02d}.jpg'), canvas_val)
-
     cleanup()
 
 
