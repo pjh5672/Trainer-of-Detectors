@@ -258,7 +258,7 @@ def main_work(rank, world_size, args, logger):
             for det in gather_objects:
                 detections.extend(det)
             mAP_info, eval_text = evaluator(detections)
-            logging.warning(message + f' mAP computation time: {time.time() - start:.4f} sec')
+            logging.warning(message + f' mAP Computation Time(sec): {time.time() - start:.4f}')
             logging.warning(eval_text)
 
             if mAP_info['all']['mAP050'] > best_mAP:
