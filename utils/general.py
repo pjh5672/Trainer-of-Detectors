@@ -2,7 +2,6 @@ import os
 import cv2
 import torch
 import numpy as np
-from tqdm import tqdm
 
 
 def save_model(model, save_path, model_name):

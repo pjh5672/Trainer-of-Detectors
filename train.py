@@ -49,8 +49,8 @@ def cleanup():
     
 
 def execute_train(rank, dataloader, model, criterion, optimizer, class_list, color_list):
-    loss_per_phase = defaultdict(float)
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
+    total_loss = 0.0
     model.train()
 
     for index, mini_batch in enumerate(dataloader):
@@ -72,31 +72,28 @@ def execute_train(rank, dataloader, model, criterion, optimizer, class_list, col
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
-            loss_per_phase[f'{loss_name}'] += loss_value
-            monitor_text += f'{loss_name}: {loss_value.item():.2f} '
-
+            if loss_name == 'total':
+                total_loss += loss_value
+            else:
+                monitor_text += f'{loss_name}: {loss_value.item():.2f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
-    
-    for loss_name in loss_per_phase.keys():
-        loss_per_phase[loss_name] /= len(dataloader)
-        if OS_SYSTEM == 'Linux':
-            dist.all_reduce(loss_per_phase[loss_name], op=dist.ReduceOp.SUM)
 
-    if rank == 0:
-        canvas = visualize_target(canvas_img, canvas_gt, class_list, color_list)
-    else:
-        canvas = None
+    total_loss /= len(dataloader)
+    if OS_SYSTEM == 'Linux':
+        dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
+
+    canvas = visualize_target(canvas_img, canvas_gt, class_list, color_list) if rank == 0 else None
 
     del mini_batch, images, predictions, losses
     torch.cuda.empty_cache()
-    return loss_per_phase, canvas
+    return total_loss, canvas
     
 
 @torch.no_grad()
 def execute_val(rank, world_size, config, dataloader, model, criterion, evaluator, class_list, color_list):
-    loss_per_phase = defaultdict(float)
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
+    total_loss = 0.0
     gather_objects = [None, ] * world_size
     detections = []
     model.eval()
@@ -127,30 +124,26 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, evaluato
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
-            loss_per_phase[f'{loss_name}'] += loss_value
-            monitor_text += f'{loss_name}: {loss_value.item():.2f} '
-
+            if loss_name == 'total':
+                total_loss += loss_value
+            else:
+                monitor_text += f'{loss_name}: {loss_value.item():.2f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
 
-    for loss_name in loss_per_phase.keys():
-        loss_per_phase[loss_name] /= len(dataloader)
-        if OS_SYSTEM == 'Linux':
-            dist.all_reduce(loss_per_phase[loss_name], op=dist.ReduceOp.SUM)
-
+    total_loss /= len(dataloader)
     if OS_SYSTEM == 'Linux':
+        dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
         dist.all_gather_object(gather_objects, detections)
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
-    if rank == 0:
-        canvas = visualize_prediction(canvas_img, detections[0], config['MIN_SCORE_THRESH_FOR_IMAGING'], class_list, color_list)
-    else:
-        canvas = None
-
+    min_conf_thresh = 0.1 # just for checking val result
+    canvas = visualize_prediction(canvas_img, detections[0], min_conf_thresh, class_list, color_list) if rank == 0 else None
+    
     del mini_batch, images, predictions, losses
     torch.cuda.empty_cache()
-    return loss_per_phase, gather_objects, canvas
+    return total_loss, gather_objects, canvas
 
 
 def main_work(rank, world_size, args, logger):
@@ -168,7 +161,7 @@ def main_work(rank, world_size, args, logger):
     class_list = data_item['NAMES']
     color_list = generate_random_color(num_colors=len(class_list))
     transformers = build_transformer(input_size=(input_size, input_size), augment_strong=config_item['AUGMENT_STRONG'])
-    train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=transformers['train'], 
+    train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=transformers['train'],
                         augment_infos=(transformers['input_size'], transformers['augment_strong']))
     val_set = Dataset(data_path=args.data_path, phase='val',  rank=rank, time_created=TIMESTAMP, transformer=transformers['val'])
     
@@ -199,7 +192,7 @@ def main_work(rank, world_size, args, logger):
 
     ################################### Calculate BPR ####################################
     if config_item['GET_PBR']:
-        dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=120, leave=False) if rank == 0 else train_loader
+        dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=110, leave=False) if rank == 0 else train_loader
         PBR_params = [input_size, criterion.num_anchor_per_scale, criterion.anchors, criterion.strides]
         total_n_train, total_n_target = check_best_possible_recall(dataloader, PBR_params, config_item['ANCHOR_IOU_THRESHOLD'])
         
@@ -238,14 +231,14 @@ def main_work(rank, world_size, args, logger):
 
     #################################### Train Model ####################################
     best_mAP = args.init_score
-    progress_bar = tqdm(range(1, config_item['NUM_EPOCHS']+1), ncols=120) if rank == 0 else range(1, config_item['NUM_EPOCHS']+1)
+    progress_bar = tqdm(range(1, config_item['NUM_EPOCHS']+1), ncols=110) if rank == 0 else range(1, config_item['NUM_EPOCHS']+1)
 
     for epoch in progress_bar:
         if rank == 0:
             message = f'[Epoch:{epoch:03d}/{len(progress_bar):03d}]'
             progress_bar.set_description(desc=message)
-            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=120, leave=False)
-            val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=120, leave=False)
+            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=110, leave=False)
+            val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=110, leave=False)
         
         train_sampler.set_epoch(epoch)
         train_loss, canvas_train = execute_train(rank=rank, dataloader=train_loader, model=model, criterion=criterion, 
@@ -257,7 +250,7 @@ def main_work(rank, world_size, args, logger):
         scheduler.step()
 
         if rank == 0:
-            monitor_text = f' Train Loss: {train_loss["total"]/world_size:.2f}, Val Loss: {val_loss["total"]/world_size:.2f}'
+            monitor_text = f' Train Loss: {train_loss/world_size:.2f}, Val Loss: {val_loss/world_size:.2f}'
             logging.warning(message + monitor_text)
 
             start = time.time()
@@ -265,7 +258,7 @@ def main_work(rank, world_size, args, logger):
             for det in gather_objects:
                 detections.extend(det)
             mAP_info, eval_text = evaluator(detections)
-            logging.warning(message + f' mAP computation time: {time.time() - start:.2f} sec')
+            logging.warning(message + f' mAP computation time: {time.time() - start:.4f} sec')
             logging.warning(eval_text)
 
             if mAP_info['all']['mAP050'] > best_mAP:
