@@ -1,4 +1,5 @@
 import os
+import time
 import shutil
 import logging
 import platform
@@ -32,7 +33,6 @@ cudnn.benchmark = True
 
 assert OS_SYSTEM in ('Linux', 'Windows'), 'This is not supported on the Operating System.'
 
-import time
 
 
 def setup(rank, world_size):
@@ -258,11 +258,14 @@ def main_work(rank, world_size, args, logger):
 
         if rank == 0:
             monitor_text = f' Train Loss: {train_loss["total"]/world_size:.2f}, Val Loss: {val_loss["total"]/world_size:.2f}'
+            logging.warning(message + monitor_text)
+
+            start = time.time()
             detections = []
             for det in gather_objects:
                 detections.extend(det)
             mAP_info, eval_text = evaluator(detections)
-            logging.warning(message + monitor_text)
+            logging.warning(message + f' mAP computation time: {time.time() - start:.2f} sec')
             logging.warning(eval_text)
 
             if mAP_info['all']['mAP050'] > best_mAP:
