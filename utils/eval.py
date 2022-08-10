@@ -55,14 +55,14 @@ class Evaluator():
         eval_text = '\n'
         for areaLbl in self.areaRngLbl:
             if areaLbl == 'all':
-                eval_text += self.summarize(mAP_info[areaLbl]['mAP05095'], iouThr=None, areaLbl=areaLbl, maxDets=self.maxDets)
+                eval_text += self.summarize(mAP_info[areaLbl]['mAP_5095'], iouThr=None, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
-                eval_text += self.summarize(mAP_info[areaLbl]['mAP050'], iouThr=0.5, areaLbl=areaLbl, maxDets=self.maxDets)
+                eval_text += self.summarize(mAP_info[areaLbl]['mAP_50'], iouThr=0.50, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
-                eval_text += self.summarize(mAP_info[areaLbl]['mAP075'], iouThr=0.75, areaLbl=areaLbl, maxDets=self.maxDets)
+                eval_text += self.summarize(mAP_info[areaLbl]['mAP_75'], iouThr=0.75, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
             else:
-                eval_text += self.summarize(mAP_info[areaLbl]['mAP050'], iouThr=0.5, areaLbl=areaLbl, maxDets=self.maxDets)
+                eval_text += self.summarize(mAP_info[areaLbl]['mAP_50'], iouThr=0.50, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
         return mAP_info, eval_text
 
@@ -76,32 +76,36 @@ class Evaluator():
 
 
     def calculate_mAP(self, AP_info_per_class):
-        AP050_per_class = {}
-        num_positives_per_class, num_TP_per_class, num_FP_per_class = {}, {}, {}
-        mAP050, mAP075, mAP05095 = 0, 0, 0
+        AP_50_per_class, PR_50_pts_per_class = {}, {}
+        num_true_per_class, num_positive_per_class, num_TP_50_per_class, num_FP_50_per_class = {}, {}, {}, {}
+        mAP_50, mAP_75, mAP_5095 = 0, 0, 0
         valid_num_classes = 1e-10
 
         for res in AP_info_per_class:
-            if res['total_positives'] > 0:
-                valid_num_classes += 1 
-                AP050_per_class[res['class']] = res['AP050']
-                num_positives_per_class[res['class']] = res['total_positives']
-                num_TP_per_class[res['class']] = res['total_TP']
-                num_FP_per_class[res['class']] = res['total_FP']
-                mAP050 += res['AP050']
-                mAP075 += res['AP075']
-                mAP05095 += res['AP05095']
-        mAP050 /= valid_num_classes
-        mAP075 /= valid_num_classes
-        mAP05095 /= valid_num_classes
+            if res['total_positive'] > 0:
+                valid_num_classes += 1
+                AP_50_per_class[res['class']] = res['AP_50']
+                PR_50_pts_per_class[res['class']] = {'mprec': res['precision_50'], 'mrec': res['recall_50']}
+                num_true_per_class[res['class']] = res['total_true']
+                num_positive_per_class[res['class']] = res['total_positive']
+                num_TP_50_per_class[res['class']] = res['total_TP_50']
+                num_FP_50_per_class[res['class']] = res['total_FP_50']
+                mAP_50 += res['AP_50']
+                mAP_75 += res['AP_75']
+                mAP_5095 += res['AP_5095']
+        mAP_50 /= valid_num_classes
+        mAP_75 /= valid_num_classes
+        mAP_5095 /= valid_num_classes
 
-        res = {'AP050_PER_CLASS': AP050_per_class,
-                'num_positives_per_class': num_positives_per_class,
-                'num_TP_per_class': num_TP_per_class,
-                'num_FP_per_class': num_FP_per_class,
-                'mAP050': mAP050,
-                'mAP075': mAP075,
-                'mAP05095': mAP05095}
+        res = {'AP_50_PER_CLASS': AP_50_per_class,
+                'PR_50_PTS_PER_CLASS': PR_50_pts_per_class,
+                'NUM_TRUE_PER_CLASS': num_true_per_class,
+                'NUM_POSITIVE_PER_CLASS': num_positive_per_class,
+                'NUM_TP_50_PER_CLASS': num_TP_50_per_class,
+                'NUM_FP_50_PER_CLASS': num_FP_50_per_class,
+                'mAP_50': mAP_50,
+                'mAP_75': mAP_75,
+                'mAP_5095': mAP_5095}
         return res
 
 
@@ -117,14 +121,15 @@ class Evaluator():
 
         if num_positive == 0:
             res = {'class': class_id,
-                    'precision05': 0,
-                    'recall05': 0,
-                    'AP050': 0,
-                    'AP075': 0,
-                    'AP05095': 0,
-                    'total_positives': num_positive,
-                    'total_TP': np.sum(TP),
-                    'total_FP': np.sum(FP)}
+                    'precision_50': 0,
+                    'recall_50': 0,
+                    'total_true': num_true,
+                    'total_positive': num_positive,
+                    'total_TP_50': np.sum(TP[0]),
+                    'total_FP_50': np.sum(FP[0]),
+                    'AP_50': 0,
+                    'AP_75': 0,
+                    'AP_5095': 0}
             return res
 
         flag_GT_per_image = {}
@@ -158,24 +163,27 @@ class Evaluator():
         prec = np.divide(acc_TP, (acc_FP + acc_TP))
 
         APs = []
-        AP05095 = 0
+        AP_5095 = 0
         for idx in range(len(self.iouThrs)):
-            ap = self.calculate_ElevenPointInterpolatedAP(rec[idx], prec[idx])
+            ap, mprec, mrec = self.ElevenPointInterpolatedAP(rec[idx], prec[idx])
+            if idx == 0:
+                mprec_50 = mprec
+                mrec_50 = mrec
             APs.append(ap)
-            AP05095 += (self.iouThrs[idx] * ap)
-        AP05095 /= sum(self.iouThrs)
+            AP_5095 += (self.iouThrs[idx] * ap)
+        AP_5095 /= sum(self.iouThrs)
 
         res = {'class' : class_id,
-                'precision05' : list(prec[0].round(4)),
-                'recall05' : list(rec[0].round(4)),
-                'AP050' : APs[0],
-                'AP075' : APs[5],
-                'AP05095' : AP05095,
-                'total_positives' : num_positive,
-                'total_TP' : np.sum(TP),
-                'total_FP' : np.sum(FP)}
+                'precision_50' : mprec_50,
+                'recall_50' : mrec_50,
+                'total_true': num_true,
+                'total_positive' : num_positive,
+                'total_TP_50': np.sum(TP[0]),
+                'total_FP_50': np.sum(FP[0]),
+                'AP_50' : APs[0],
+                'AP_75' : APs[5],
+                'AP_5095' : AP_5095}
         return res
-
 
     def split_areaRng(self, predictions):
         items = defaultdict(list)
@@ -249,22 +257,46 @@ class Evaluator():
         result = intersect / (union-intersect)
         return result
 
-    def calculate_ElevenPointInterpolatedAP(self, rec, prec):
+    def ElevenPointInterpolatedAP(self, rec, prec):
         mrec = [e for e in rec]
         mpre = [e for e in prec]
 
         recallValues = np.linspace(0, 1, 11)
         recallValues = list(recallValues[::-1])
-        rhoInterp, recallValid = [], []
-
+        rhoInterp = []
+        recallValid = []
+        # For each recallValues (0, 0.1, 0.2, ... , 1)
         for r in recallValues:
+            # Obtain all recall values higher or equal than r
             argGreaterRecalls = np.argwhere(mrec[:] >= r)
             pmax = 0
-
+            # If there are recalls above r
             if argGreaterRecalls.size != 0:
                 pmax = max(mpre[argGreaterRecalls.min():])
-
             recallValid.append(r)
             rhoInterp.append(pmax)
+
+        # By definition AP = sum(max(precision whose recall is above r))/11
         ap = sum(rhoInterp) / 11
-        return ap
+
+        # Generating values for the plot
+        rvals = []
+        rvals.append(recallValid[0])
+        [rvals.append(e) for e in recallValid]
+        rvals.append(0)
+        pvals = []
+        pvals.append(0)
+        [pvals.append(e) for e in rhoInterp]
+        pvals.append(0)
+
+        cc = []
+        for i in range(len(rvals)):
+            p = (rvals[i], pvals[i - 1])
+            if p not in cc:
+                cc.append(p)
+            p = (rvals[i], pvals[i])
+            if p not in cc:
+                cc.append(p)
+        recallValues = [i[0] for i in cc]
+        rhoInterp = [i[1] for i in cc]
+        return ap, rhoInterp, recallValues

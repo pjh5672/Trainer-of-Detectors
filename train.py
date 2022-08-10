@@ -261,16 +261,29 @@ def main_work(rank, world_size, args, logger):
             logging.warning(message + f' mAP Computation Time(sec): {time.time() - start:.4f}')
             logging.warning(eval_text)
 
-            if mAP_info['all']['mAP050'] > best_mAP:
-                best_mAP = mAP_info['all']['mAP050']
+            if epoch % args.img_log_interval == 0:
+                imwrite(str(args.exp_path / 'images' / 'train' / f'target_EP{epoch:03d}.jpg'), canvas_train)
+                imwrite(str(args.exp_path / 'images' / 'val' / f'pred_EP{epoch:03d}.jpg'), canvas_val)
+
+            if epoch >= args.start_analysis:
+                if epoch % args.analysis_log_interval == 0:
+                    data_df, figure_AP, figure_detect_rate, fig_PR_curves = analyse_mAP_info(mAP_info, class_list, evaluator.areaRngLbl)
+                    data_df.to_csv(str(args.exp_path / 'analysis' / f'dataframe_EP{epoch:03d}.csv'))
+                    figure_AP.savefig(str(args.exp_path / 'analysis' / f'figure-AP_EP{epoch:03d}.png'))
+                    figure_detect_rate.savefig(str(args.exp_path / 'analysis' / f'figure-detect-rate_EP{epoch:03d}.png'))
+
+                    PR_curve_dir = args.exp_path / 'analysis' / 'PR_curve' / f'EP{epoch:03d}'
+                    os.makedirs(PR_curve_dir, exist_ok=True)
+                    for class_id in fig_PR_curves.keys():
+                        fig_PR_curves[class_id].savefig(str(PR_curve_dir / f'{class_list[class_id]}.png'))
+                    del figure_AP, figure_detect_rate, fig_PR_curves
+
+            if mAP_info['all']['mAP_50'] > best_mAP:
+                best_mAP = mAP_info['all']['mAP_50']
                 model_to_save = model.module if hasattr(model, 'module') else model
                 save_model(model=deepcopy(model_to_save).cpu(), 
-                            save_path=args.exp_path / 'weights', 
-                            model_name=f'{TIMESTAMP}-EP{epoch:02d}.pth')
-
-            if epoch % args.img_log_interval == 0:
-                imwrite(str(args.exp_path / 'images' / 'train' / f'{TIMESTAMP}-EP{epoch:02d}.jpg'), canvas_train)
-                imwrite(str(args.exp_path / 'images' / 'val' / f'{TIMESTAMP}-EP{epoch:02d}.jpg'), canvas_val)
+                           save_path=args.exp_path / 'weights', 
+                           model_name=f'weights_EP{epoch:03d}.pth')
     cleanup()
 
 
@@ -281,21 +294,23 @@ def main():
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
     parser.add_argument('--gpu_ids', type=int, help='List of GPU IDs', default=[0], nargs='+')
     parser.add_argument('--img_log_interval', type=int, default=1, help='Image logging interval')
-    parser.add_argument('--init_score', type=float, default=0.1, help='initial mAP score for update best model')
+    parser.add_argument('--analysis_log_interval', type=int, default=1, help='Detection analysis interval')
+    parser.add_argument('--start_analysis', type=int, default=15, help='Starting analysis epoch')
+    parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
     args.config_path = ROOT / args.config_path
     args.exp_path = ROOT / 'experiments' / args.exp_name
-    os.makedirs(args.exp_path / 'logs', exist_ok=True)
     os.makedirs(args.exp_path / 'images' / 'train', exist_ok=True)
     os.makedirs(args.exp_path / 'images' / 'val', exist_ok=True)
+    os.makedirs(args.exp_path / 'analysis' / 'PR_curve', exist_ok=True)
     world_size = len(args.gpu_ids)
     assert world_size > 0, 'Executable GPU machine does not exist, This training supports on CUDA available environment.'
 
     #########################################################
     # Set multiprocessing type to spawn
     torch.multiprocessing.set_start_method('spawn', force=True)
-    logger = setup_primary_logging(args.exp_path / 'logs' / f'{TIMESTAMP}.log')
+    logger = setup_primary_logging(args.exp_path / 'analysis'/ f'train.log')
     mp.spawn(main_work, args=(world_size, args, logger), nprocs=world_size, join=True)
     #########################################################
 

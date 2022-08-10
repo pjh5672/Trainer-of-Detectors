@@ -118,7 +118,6 @@ class YOLOv3_Loss():
 
         for index, iou in enumerate(iou_target_with_anchor.t()):
             noobj_mask[iou > self.ignore_threshold, grid_ij[1][index], grid_ij[0][index]] = 0
-
         return best_anchor_index, obj_mask, noobj_mask
 
 
