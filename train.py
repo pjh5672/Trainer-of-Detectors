@@ -297,6 +297,7 @@ def main():
     parser.add_argument('--analysis_log_interval', type=int, default=1, help='Detection analysis interval')
     parser.add_argument('--start_analysis', type=int, default=15, help='Starting analysis epoch')
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
+    
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
     args.config_path = ROOT / args.config_path
@@ -310,7 +311,7 @@ def main():
     #########################################################
     # Set multiprocessing type to spawn
     torch.multiprocessing.set_start_method('spawn', force=True)
-    logger = setup_primary_logging(args.exp_path / 'analysis'/ f'train.log')
+    logger = setup_primary_logging(args.exp_path / f'train.log')
     mp.spawn(main_work, args=(world_size, args, logger), nprocs=world_size, join=True)
     #########################################################
 
