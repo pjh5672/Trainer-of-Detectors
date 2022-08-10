@@ -294,8 +294,8 @@ def main():
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
     parser.add_argument('--gpu_ids', type=int, help='List of GPU IDs', default=[0], nargs='+')
     parser.add_argument('--img_log_interval', type=int, default=1, help='Image logging interval')
-    parser.add_argument('--analysis_log_interval', type=int, default=1, help='Detection analysis interval')
-    parser.add_argument('--start_analysis', type=int, default=15, help='Starting analysis epoch')
+    parser.add_argument('--analysis_log_interval', type=int, default=5, help='Detection analysis interval')
+    parser.add_argument('--start_analysis', type=int, default=10, help='Starting analysis epoch')
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
     
     args = parser.parse_args()
