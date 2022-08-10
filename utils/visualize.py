@@ -83,12 +83,13 @@ def visualize_target(tensor_image, target, class_list, color_list):
 
 
 def visualize_AP_per_class(data_df):
-    plt.figure(figsize=(10, len(data_df)/4+2))
+    plt.figure(figsize=(8, len(data_df)/4+4))
     ax = sns.barplot(x='AP_50', y='CATEGORY', data=data_df)
     ax.set(xlabel='Category', ylabel='AP@.50', title='AP@.50 per category')
     ax2 = ax.twiny()
     ax2.set_xlim(ax.get_xlim())
     fig = ax.get_figure()
+    fig.tight_layout()
     return fig
 
 
@@ -99,7 +100,7 @@ def visualize_detect_rate_per_class(data_df, scale=10):
 
     plt.figure(figsize=(10, len(data_df)+2))
     ax = sns.barplot(x='VALUE', y='CATEGORY', hue='SOURCE', data=df_melt, palette='pastel')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.legend(bbox_to_anchor=(1.02, 1), loc=2, borderaxespad=0.)
     ax.set_xlabel('FP')
     ax.set_xticklabels(ax.get_xticks() * scale)
     ax2 = ax.twiny()
@@ -107,6 +108,7 @@ def visualize_detect_rate_per_class(data_df, scale=10):
     ax2.set_xticklabels(ax.get_xticks())
     ax2.set_xlabel('True & TP & FN')
     fig = ax.get_figure()
+    fig.tight_layout()
     return fig
 
 
@@ -120,6 +122,7 @@ def visualize_PR_curve_per_class(pr_pts_per_class, class_list):
         ax = sns.lineplot(x=mrec, y=mprec, estimator=None, sort=False)
         ax.set(xlabel='Recalls', ylabel='Precisions', title=f'{class_list[class_id]}')
         fig = ax.get_figure()
+        fig.tight_layout()
         fig_PR_curves[class_id] = fig
     return fig_PR_curves
     
