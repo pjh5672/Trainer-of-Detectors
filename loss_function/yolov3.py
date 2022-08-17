@@ -132,10 +132,9 @@ class YOLOv3_Loss():
                                 device=self.device, dtype=torch.float32)
         target_cls = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size, self.num_classes), 
                                 device=self.device, dtype=torch.float32)
-
         target_c = target[:, 0].long()
         
-        if (target_c == -1).any():
+        if -1 in target_c:
             obj_mask = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
                                    device=self.device, dtype=torch.uint8)
             noobj_mask = torch.ones(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
@@ -208,9 +207,9 @@ if __name__ == "__main__":
     batch_size = 2
     device = torch.device('cpu')
 
-    transformers = build_transformer(image_size=(416, 416))
-    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformers['train'])
-    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformers['val'])
+    transformer = build_transformer(image_size=(416, 416))
+    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformer['train'])
+    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformer['val'])
     dataloaders = {}
     dataloaders['train'] = DataLoader(train_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)
     dataloaders['val'] = DataLoader(val_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)         
