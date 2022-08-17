@@ -1,0 +1,25 @@
+[pylint]
+
+disable=
+    E0401, # Unable to import 'torch' (import-error)
+    R0913, # Too many arguments 
+    R0914, # Too many local variables
+    C0200, # Consider using enumerate instead of iterating with range and len
+    E0602, # Undefined variable
+    W1514, # Using open without explicitly specifying an encoding (unspecified-encoding)
+    C0103, # Variable name "f" doesn't conform to snake_case naming style (invalid-name)
+    W1203, # Use lazy % formatting in logging functions (logging-fstring-interpolation)
+    C3001, # Lambda expression assigned to a variable. Define a function using the "def" keyword instead. (unnecessary-lambda-assignment)
+    C0206, # Consider iterating with .items() (consider-using-dict-items)
+    C0201, # Consider iterating the dictionary directly instead of calling .keys() (consider-iterating-dictionary)
+    R0912, # Too many branches 
+    R0915, # Too many statements
+    E1101, # Module 'torch' has no 'cat'/'tensor' member
+    C0301, # Line too long (line-too-long)
+    W0401, # Wildcard import utils (wildcard-import)
+    W0614, # Unused import(s)
+    C0114, # Missing module docstring (missing-module-docstring)
+    R0402, # Use 'from torch import optim' instead (consider-using-from-import)
+    C0116, # Missing function or method docstring (missing-function-docstring)
+    E1121, # Too many positional arguments for function call (too-many-function-args)
+    C0209, # Formatting a regular string which could be a f-string (consider-using-f-string)

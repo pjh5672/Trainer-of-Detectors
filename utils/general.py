@@ -4,9 +4,9 @@ import torch
 import numpy as np
 
 
-def save_model(model, save_path, model_name):
-    os.makedirs(save_path, exist_ok=True)
-    torch.save(model.state_dict(), save_path / model_name)
+
+def save_model(model, save_path):
+    torch.save(model.state_dict(), save_path)
 
 
 def scale_to_original(bboxes, scale_w, scale_h):

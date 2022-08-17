@@ -28,8 +28,6 @@ def build_transformer(input_size=(416, 416), augment_strong=0):
         ToTensorV2()],
         bbox_params=album.BboxParams(format='yolo', label_fields=['class_ids']),
     )
-    transformers['input_size'] = input_size
-    transformers['augment_strong'] = augment_strong
     return transformers
 
 

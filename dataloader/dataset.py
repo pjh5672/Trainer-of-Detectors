@@ -21,7 +21,7 @@ from utils import *
 
 
 class Dataset():
-    def __init__(self, data_path, phase, rank, time_created, transformer=None, augment_infos=None):
+    def __init__(self, data_path, phase, rank, time_created, transformer=None):
         with open(data_path) as f:
             data_item = yaml.load(f, Loader=yaml.FullLoader)
         
@@ -50,9 +50,6 @@ class Dataset():
         cache, self.data_info = make_cache_file(cache_dir=cache_dir, file_name=save_name, phase=phase, 
                                                 data_path=data_path, time_created=time_created)
         assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files" 
-        
-        if augment_infos is not None:
-            self.input_size, self.augment_strong = augment_infos
         self.transformer = transformer
 
 

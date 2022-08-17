@@ -13,9 +13,7 @@ class Evaluator():
 
         self.image_to_info = {}
         for item in GT_data['images']:
-            self.image_to_info[item['filename']] = {'image_id': item['id'], 
-                                                    'height': item['height'], 
-                                                    'width': item['width']}
+            self.image_to_info[item['filename']] = {'image_id': item['id'], 'height': item['height'], 'width': item['width']}
         self.maxDets = config['MAX_DETS']
         self.areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
         self.areaRngLbl = ['all', 'small', 'medium', 'large']
@@ -125,8 +123,8 @@ class Evaluator():
                     'recall_50': 0,
                     'total_true': num_true,
                     'total_positive': num_positive,
-                    'total_TP_50': np.sum(TP[0]),
-                    'total_FP_50': np.sum(FP[0]),
+                    'total_TP_50': int(np.sum(TP[0])),
+                    'total_FP_50': int(np.sum(FP[0])),
                     'AP_50': 0,
                     'AP_75': 0,
                     'AP_5095': 0}
@@ -178,8 +176,8 @@ class Evaluator():
                 'recall_50' : mrec_50,
                 'total_true': num_true,
                 'total_positive' : num_positive,
-                'total_TP_50': np.sum(TP[0]),
-                'total_FP_50': np.sum(FP[0]),
+                'total_TP_50': int(np.sum(TP[0])),
+                'total_FP_50': int(np.sum(FP[0])),
                 'AP_50' : APs[0],
                 'AP_75' : APs[5],
                 'AP_5095' : AP_5095}

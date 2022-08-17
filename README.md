@@ -21,6 +21,7 @@ This is repository for source code to train various object detection models.  cu
 
 | Date | Content |
 |:----:|:-----|
+| 08-17 | bug:sanity check for avoiding CUDA runtime error(device-side assert triggered) during training |
 | 08-10 | add:visualize functions for PR curve, AP@0.50, num of detection rate(TP, FP, FN) per class |
 | 08-09 | fix:mAP calculation optimization x150 speed up and process await delay reduction with DDP training |
 | 08-07 | add:learning rate scheduler (160 epochs with starting inital lr:0.001, dividing it by 10 at 30, 60 epochs) |
