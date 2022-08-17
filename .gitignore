@@ -1,6 +1,5 @@
 # Ny files
 *.cache
-*.txt
 *.pth
 experiments/*/
 
