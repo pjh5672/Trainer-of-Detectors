@@ -38,8 +38,7 @@ class YOLOv3_Loss():
         self.strides = [model.head.head_L.stride, model.head.head_M.stride, model.head.head_S.stride]
         self.num_anchors = len(self.anchors)
         self.mae_loss = nn.L1Loss(reduction='sum')
-        self.bce_loss = nn.BCELoss(reduction='sum')
-
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='sum')
 
 
     def __call__(self, predictions, targets):
@@ -55,13 +54,13 @@ class YOLOv3_Loss():
 
             prediction_each_scale = prediction_each_scale.view(self.batch_size, self.num_anchor_per_scale, self.grid_size, self.grid_size, -1)
             pred_box = prediction_each_scale[..., :4]
-            pred_obj = prediction_each_scale[..., 4]
-            pred_cls = prediction_each_scale[..., 5:]
+            pred_obj_logit = prediction_each_scale[..., 4]
+            pred_cls_logit = prediction_each_scale[..., 5:]
 
             pred_tx, pred_ty, pred_tw, pred_th = self.transfrom_batch_pred_loss_form(pred_box, anchor_each_scale, stride_each_scale)
             target_loss_forms = self.transform_batch_target_loss_form(targets, anchor_each_scale)
             b_obj_mask, b_noobj_mask, b_target_tx, b_target_ty, b_target_tw, b_target_th, b_target_cls = target_loss_forms
-            b_target_obj = b_obj_mask.float()
+            b_target_obj = b_obj_mask.clone()
             b_obj_mask = b_obj_mask.type(torch.BoolTensor)
             b_noobj_mask = b_noobj_mask.type(torch.BoolTensor)
 
@@ -69,9 +68,9 @@ class YOLOv3_Loss():
             loss_ty = self.mae_loss(pred_ty[b_obj_mask], b_target_ty[b_obj_mask])
             loss_tw = self.mae_loss(pred_tw[b_obj_mask], b_target_tw[b_obj_mask])
             loss_th = self.mae_loss(pred_th[b_obj_mask], b_target_th[b_obj_mask])
-            loss_obj = self.bce_loss(pred_obj[b_obj_mask], b_target_obj[b_obj_mask])
-            loss_noobj = self.bce_loss(pred_obj[b_noobj_mask], b_target_obj[b_noobj_mask])
-            loss_cls = self.bce_loss(pred_cls[b_obj_mask], b_target_cls[b_obj_mask])
+            loss_obj = self.bce_loss(pred_obj_logit[b_obj_mask], b_target_obj[b_obj_mask])
+            loss_noobj = self.bce_loss(pred_obj_logit[b_noobj_mask], b_target_obj[b_noobj_mask])
+            loss_cls = self.bce_loss(pred_cls_logit[b_obj_mask], b_target_cls[b_obj_mask])
 
             coord_loss += (loss_tx + loss_ty + loss_tw + loss_th)
             obj_loss += loss_obj
@@ -106,9 +105,9 @@ class YOLOv3_Loss():
 
     def build_target_mask(self, grid_ij, target_xy, target_wh, anchor_each_scale):
         obj_mask = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
-                               device=self.device, dtype=torch.uint8)
+                               device=self.device, dtype=torch.float32)
         noobj_mask = torch.ones(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
-                                device=self.device, dtype=torch.uint8)
+                                device=self.device, dtype=torch.float32)
         iou_target_with_anchor = [get_IoU_target_with_anchor(target_wh.t(), anchor) for anchor in anchor_each_scale]
         iou_target_with_anchor = torch.stack(iou_target_with_anchor, dim=0)
         best_iou, best_anchor_index = iou_target_with_anchor.max(dim=0)
@@ -130,15 +129,15 @@ class YOLOv3_Loss():
                                 device=self.device, dtype=torch.float32)
         target_th = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
                                 device=self.device, dtype=torch.float32)
-        target_cls = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size, self.num_classes), 
+        target_cls = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size, self.num_classes),
                                 device=self.device, dtype=torch.float32)
         target_c = target[:, 0].long()
         
         if -1 in target_c:
             obj_mask = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
-                                   device=self.device, dtype=torch.uint8)
+                                   device=self.device, dtype=torch.float32)
             noobj_mask = torch.ones(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
-                                    device=self.device, dtype=torch.uint8)
+                                    device=self.device, dtype=torch.float32)
             return obj_mask, noobj_mask, target_tx, target_ty, target_tw, target_th, target_cls
 
         target_xy = target[:, 1:3] * self.grid_size

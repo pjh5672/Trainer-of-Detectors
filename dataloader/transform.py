@@ -6,18 +6,13 @@ from albumentations.pytorch import ToTensorV2
 
 def build_transformer(input_size=(416, 416), augment_strong=0):
     input_h, input_w = input_size
-    initial_rotate = 100
-    initial_color_shift = 100
+    init_geometric = 100
 
     transformers = {}
     transformers['train'] = album.Compose([
         album.HorizontalFlip(p=0.5),
         album.RandomSizedBBoxSafeCrop(height=input_h, width=input_w),
-        album.ShiftScaleRotate(rotate_limit=initial_rotate*augment_strong, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), p=1.0),
-        album.RGBShift(r_shift_limit=initial_color_shift*augment_strong, 
-                        g_shift_limit=initial_color_shift*augment_strong, 
-                        b_shift_limit=initial_color_shift*augment_strong, p=1),
-        album.RandomBrightnessContrast(p=0.5),
+        album.ShiftScaleRotate(rotate_limit=init_geometric*augment_strong, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0), p=1),
         album.Normalize(mean=(0.485, 0.456, 0.406),std=(0.229, 0.224, 0.225)),
         ToTensorV2()],
         bbox_params=album.BboxParams(format='yolo', min_area=25, min_visibility=0.1, label_fields=['class_ids']),

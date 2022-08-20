@@ -1,25 +1,18 @@
 import torch
 import torch.nn as nn
 
-from element import ConvLayer
 
 
 
 class DetectLayer(nn.Module):
-    def __init__(self, input_size, in_channels, num_classes, anchors, num_anchor_per_scale):
+    def __init__(self, input_size, num_classes, anchors, num_anchor_per_scale):
         super().__init__()
         self.input_size = input_size
         self.num_classes = num_classes
-        self.num_anchor_per_scale = num_anchor_per_scale
         self.num_attribute =  5 + num_classes
-        self.last_dim_channels = self.num_attribute * self.num_anchor_per_scale
+        self.num_anchor_per_scale = num_anchor_per_scale
         self.anchor_w = anchors[:, 0].view((1, self.num_anchor_per_scale, 1, 1))
         self.anchor_h = anchors[:, 1].view((1, self.num_anchor_per_scale, 1, 1))
-
-        self.conv = nn.Sequential(
-            ConvLayer(in_channels, in_channels*2, 3, stride=1, padding=1),
-            nn.Conv2d(in_channels*2, self.last_dim_channels, 1, stride=1, padding=0)
-        )
 
 
     def forward(self, x):
@@ -28,15 +21,12 @@ class DetectLayer(nn.Module):
         grid_size = x.shape[2]
         self.stride = self.input_size / grid_size
 
-        out = self.conv(x)
-        out = out.view(batch_size, self.num_anchor_per_scale, self.num_attribute, grid_size, grid_size)
+        out = x.view(batch_size, self.num_anchor_per_scale, self.num_attribute, grid_size, grid_size)
         out = out.permute(0, 1, 3, 4, 2).contiguous()
-
         grid_xy = self.compute_grid_offset(grid_size)
         pred_bboxes = self.transform_pred_coords(bboxes=out[..., :4], grid_xy=grid_xy)
-        pred_object = torch.sigmoid(out[..., 4])
-        pred_class = torch.sigmoid(out[..., 5:])
-
+        pred_object = out[..., 4]
+        pred_class = out[..., 5:]
         prediction = torch.cat((pred_bboxes.view(batch_size, -1, 4),
                                 pred_object.view(batch_size, -1, 1),
                                 pred_class.view(batch_size, -1, self.num_classes)),
@@ -62,33 +52,30 @@ class DetectLayer(nn.Module):
 
 
 class YOLOv3_head(nn.Module):
-    def __init__(self, input_size, num_classes, anchors):
+    def __init__(self, input_size, num_classes, anchors, num_anchor_per_scale):
         super().__init__()
         self.input_size = input_size
         self.num_classes = num_classes
-        self.num_anchor_per_scale = len(anchors[2])
-        self.anchor_L = torch.Tensor(anchors[2])
-        self.anchor_M = torch.Tensor(anchors[1])
-        self.anchor_S = torch.Tensor(anchors[0])
-        
+        self.anchor_scale = self.input_size / 416
+        self.num_anchor_per_scale = num_anchor_per_scale
+        self.anchor_L = torch.Tensor(anchors[2]) * self.anchor_scale
+        self.anchor_M = torch.Tensor(anchors[1]) * self.anchor_scale
+        self.anchor_S = torch.Tensor(anchors[0]) * self.anchor_scale
+
         self.head_L = DetectLayer(input_size=self.input_size,
-                                  in_channels=512,
                                   num_classes=self.num_classes,
                                   anchors=self.anchor_L,
                                   num_anchor_per_scale=self.num_anchor_per_scale)
 
         self.head_M = DetectLayer(input_size=self.input_size,
-                                  in_channels=256,
                                   num_classes=self.num_classes,
                                   anchors=self.anchor_M,
                                   num_anchor_per_scale=self.num_anchor_per_scale)
 
         self.head_S = DetectLayer(input_size=self.input_size,
-                                  in_channels=128,
                                   num_classes=self.num_classes,
                                   anchors=self.anchor_S,
                                   num_anchor_per_scale=self.num_anchor_per_scale)
-        
 
     def forward(self, x):
         P3, P4, P5 = x
@@ -118,9 +105,13 @@ if __name__ == "__main__":
     device = torch.device('cpu')
 
     x = torch.randn(1, 3, 416, 416).to(device)
+    num_classes = 80
+    num_attribute =  5 + num_classes
+    num_anchor_per_scale = 3
+    last_dim_channels = num_attribute * num_anchor_per_scale
     backbone = Darknet53_backbone(pretrained=True).to(device)
-    fpn = YOLOv3_FPN().to(device)
-    head = YOLOv3_head(input_size=input_size, num_classes=80, anchors=anchors)
+    fpn = YOLOv3_FPN(last_dim_channels=last_dim_channels).to(device)
+    head = YOLOv3_head(input_size=input_size, num_classes=80, anchors=anchors, num_anchor_per_scale=num_anchor_per_scale)
 
     with torch.no_grad():
         features = backbone(x)

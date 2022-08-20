@@ -53,7 +53,7 @@ def execute_train(rank, dataloader, model, criterion, optimizer, class_list, col
     model.train()
 
     for index, mini_batch in enumerate(dataloader):
-        if (rank == 0) and (index == 0):
+        if index == 0:
             canvas_img = mini_batch[0][0]
             canvas_gt = mini_batch[1][0]
 
@@ -76,11 +76,11 @@ def execute_train(rank, dataloader, model, criterion, optimizer, class_list, col
             dataloader.set_postfix_str(s=f'{monitor_text}')
 
     total_loss /= len(dataloader)
+
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
 
     canvas = visualize_target(canvas_img, canvas_gt, class_list, color_list) if rank == 0 else None
-
     del images, predictions, losses
     torch.cuda.empty_cache()
     return total_loss, canvas
@@ -106,6 +106,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
         predictions = model(images)
         losses = criterion(predictions, targets)
         predictions = torch.cat(predictions, dim=1)
+        predictions[..., 4:] = torch.sigmoid(predictions[..., 4:])
 
         for idx in range(len(filenames)):
             filename = filenames[idx]
@@ -127,6 +128,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
             dataloader.set_postfix_str(s=f'{monitor_text}')
 
     total_loss /= len(dataloader)
+
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
         dist.all_gather_object(gather_objects, detections)
@@ -134,8 +136,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
         gather_objects = [detections]
 
     min_conf_thresh = 0.1 # just for checking val result
-    canvas = visualize_prediction(canvas_img, detections[0], min_conf_thresh, class_list, color_list) if rank == 0 else None
-
+    canvas = visualize_prediction(canvas_img, detections[0][1], min_conf_thresh, class_list, color_list) if rank == 0 else None
     del images, predictions, losses
     torch.cuda.empty_cache()
     return total_loss, gather_objects, canvas
@@ -167,8 +168,7 @@ def main_work(rank, world_size, args, logger):
 
     if rank == 0:
         logging.warning(f'{train_set.data_info}')
-        logging.warning(f'{val_set.data_info}')
-        print(f'{train_set.data_info}| {val_set.data_info}')
+        logging.warning(f'{val_set.data_info}\n')
 
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
@@ -207,7 +207,7 @@ def main_work(rank, world_size, args, logger):
             dist.all_reduce(total_n_target, op=dist.ReduceOp.SUM)
 
         if rank == 0:
-            message = f'Best Possible Rate: {total_n_train/total_n_target:0.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}\n'
+            message = f'Best Possible Rate: {total_n_train/total_n_target:.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}\n'
             logging.warning(message)
 
         del dataloader
@@ -246,8 +246,9 @@ def main_work(rank, world_size, args, logger):
             val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=110, leave=False)
 
         train_sampler.set_epoch(epoch)
-        train_loss, canvas_train = execute_train(rank=rank, dataloader=train_loader, model=model, criterion=criterion,
-                                                 optimizer=optimizer, class_list=class_list, color_list=color_list)
+        train_loss, canvas_train = execute_train(rank=rank, dataloader=train_loader, model=model,
+                                                 criterion=criterion, optimizer=optimizer,
+                                                 class_list=class_list, color_list=color_list)
         val_loss, gather_objects, canvas_val = execute_val(rank=rank, world_size=world_size, config=config_item,
                                                            dataloader=val_loader, model=model, criterion=criterion,
                                                            class_list=class_list, color_list=color_list)
@@ -265,25 +266,28 @@ def main_work(rank, world_size, args, logger):
             logging.warning(message + f' mAP Computation Time(sec): {time.time() - start:.4f}')
             logging.warning(eval_text)
 
-            if epoch % args.image_log_interval == 0:
-                imwrite(str(args.image_log_dir / 'train' /f'EP{epoch:03d}.jpg'), canvas_train)
-                imwrite(str(args.image_log_dir / 'val' /f'EP{epoch:03d}.jpg'), canvas_val)
+            if epoch % args.img_interval == 0:
+                imwrite(str(args.image_log_dir / 'train' / f'EP{epoch:03d}.jpg'), canvas_train)
+                imwrite(str(args.image_log_dir / 'val' / f'EP{epoch:03d}.jpg'), canvas_val)
 
-            if (epoch >= args.start_save) and (mAP_info['all']['mAP_50'] > best_mAP):
-                best_mAP = mAP_info['all']['mAP_50']
-                model_to_save = model.module if hasattr(model, 'module') else model
-                save_model(model = deepcopy(model_to_save).cpu(), save_path = args.weight_dir / f'weight_EP{epoch:03d}.pth')
+            if epoch >= args.start_save:
+                if mAP_info['all']['mAP_50'] > best_mAP:
+                    best_mAP = mAP_info['all']['mAP_50']
+                    model_to_save = model.module if hasattr(model, 'module') else model
+                    save_model(model=deepcopy(model_to_save).cpu(), save_path=args.weight_dir / f'weight_EP{epoch:03d}.pth')
 
-                analysis_result = analyse_mAP_info(mAP_info['all'], class_list)
-                data_df, figure_AP, figure_dets, fig_PR_curves = analysis_result
-                data_df.to_csv(str(args.analysis_log_dir / f'dataframe_EP{epoch:03d}.csv'))
-                figure_AP.savefig(str(args.analysis_log_dir / f'figure-AP_EP{epoch:03d}.png'))
-                figure_dets.savefig(str(args.analysis_log_dir / f'figure-dets_EP{epoch:03d}.png'))
+                    analysis_result = analyse_mAP_info(mAP_info['all'], class_list)
+                    data_df, figure_AP, figure_dets, fig_PR_curves = analysis_result
+                    data_df.to_csv(str(args.analysis_log_dir / f'dataframe_EP{epoch:03d}.csv'))
+                    figure_AP.savefig(str(args.analysis_log_dir / f'figure-AP_EP{epoch:03d}.png'))
+                    figure_dets.savefig(str(args.analysis_log_dir / f'figure-dets_EP{epoch:03d}.png'))
 
-                PR_curve_dir = args.analysis_log_dir / 'PR_curve' / f'EP{epoch:03d}'
-                os.makedirs(PR_curve_dir, exist_ok=True)
-                for class_id in fig_PR_curves.keys():
-                    fig_PR_curves[class_id].savefig(str(PR_curve_dir / f'{class_list[class_id]}.png'))
+                    PR_curve_dir = args.analysis_log_dir / 'PR_curve' / f'EP{epoch:03d}'
+                    os.makedirs(PR_curve_dir, exist_ok=True)
+                    for class_id in fig_PR_curves.keys():
+                        fig_PR_curves[class_id].savefig(str(PR_curve_dir / f'{class_list[class_id]}.png'))
+    if rank == 0:
+        logging.warning(f' Best mAP@0.5: {best_mAP:.3f}')
     cleanup()
 
 
@@ -293,8 +297,8 @@ def main():
     parser.add_argument('--config_path', type=str, default='config/yolov3.yml', help='Path to config.yml file')
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
     parser.add_argument('--gpu_ids', type=int, default=[0], nargs='+', help='List of GPU IDs')
-    parser.add_argument('--image_log_interval', type=int, default=3, help='Image logging interval')
-    parser.add_argument('--start_save', type=int, default=10, help='Starting model saving epoch')
+    parser.add_argument('--img_interval', type=int, default=5, help='Image logging interval')
+    parser.add_argument('--start_save', type=int, default=1, help='Starting model saving epoch')
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
 
     args = parser.parse_args()

@@ -61,11 +61,10 @@ def visualize(image, label, class_list, color_list, show_class=False, show_score
     return canvas
 
 
-def visualize_prediction(tensor_image, prediction, conf_threshold, class_list, color_list):
-    pred_yolo = prediction[1]
+def visualize_prediction(tensor_image, detection, conf_threshold, class_list, color_list):
     input_size = tensor_image.shape[-1]
     canvas = denormalize(tensor_image)
-    pred_voc = pred_yolo[pred_yolo[:, 5] >= conf_threshold].copy()
+    pred_voc = detection[detection[:, 5] >= conf_threshold].copy()
     pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
     pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
     canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)
@@ -144,10 +143,10 @@ def visualize_PR_curve_per_class(pr_pts_per_class, class_list):
         mprec = pr_pts_per_class[class_id]['mprec'][::-1][1:]
         mrec = pr_pts_per_class[class_id]['mrec'][::-1][1:]
 
-        plt.figure(figsize=(3, 3))
+        plt.figure(figsize=(4, 4))
         ax = sns.lineplot(x=mrec, y=mprec, estimator=None, sort=False)
         ax.set(xlabel='Recalls', ylabel='Precisions')
-        ax.set_title(label=f'{class_list[class_id]}', fontsize=10)
+        ax.set_title(label=f'Category: {class_list[class_id]}', fontsize=12)
         plt.grid('on')
         fig = ax.get_figure()
         fig.tight_layout()

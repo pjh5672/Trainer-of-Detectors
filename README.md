@@ -2,7 +2,7 @@
 
 ## Description
 
-This is repository for source code to train various object detection models.  currently, It supports YOLOv3 model training with Darknet53(You can download darknet53 weight from [here](https://drive.google.com/file/d/1VuV0llnEPUGiPq-cKhfSQlKQ7Zg6jlp9/view?usp=sharing))
+This is repository for source code to train various object detection models. currently, It supports YOLOv3 model training with Darknet53(You can download darknet53 weight from [here](https://drive.google.com/file/d/1VuV0llnEPUGiPq-cKhfSQlKQ7Zg6jlp9/view?usp=sharing))
 **Prototyping now...**
 
 **COCO2017 Average Precision**
@@ -13,6 +13,10 @@ This is repository for source code to train various object detection models.  cu
 | YOLOv3 (paper) | 512 | 32.7 | 57.7 |
 | YOLOv3 (paper) | 608 | 33.1 | 58.2 |
 
+- **Installation of third-party package library (CUDA11.3)**
+```bash
+$ pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu113
+```
 
 ## Update
 
@@ -21,6 +25,7 @@ This is repository for source code to train various object detection models.  cu
 
 | Date | Content |
 |:----:|:-----|
+| 08-20 | fix:chnage BCELoss -> BCEWithLogitLoss due to stability in case of AMP computation |
 | 08-17 | bug:sanity check for avoiding CUDA runtime error(device-side assert triggered) during training |
 | 08-10 | add:visualize functions for PR curve, AP@0.50, num of detection rate(TP, FP, FN) per class |
 | 08-09 | fix:mAP calculation optimization x150 speed up and process await delay reduction with DDP training |

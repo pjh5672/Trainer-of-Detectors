@@ -24,7 +24,7 @@ def run_NMS_for_YOLO(prediction, iou_threshold=0.5, maxDets=100):
     x2 = bboxes[:, 0] + bboxes[:, 2]/2
     y2 = bboxes[:, 1] + bboxes[:, 3]/2
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-    order = scores.argsort()[::-1][:maxDets]
+    order = scores.argsort()[::-1]
             
     pick = []
     while len(order) > 0:
@@ -44,4 +44,4 @@ def run_NMS_for_YOLO(prediction, iou_threshold=0.5, maxDets=100):
         overlap = (w * h)
         ious = overlap / (areas[i] + areas[order[1:]] - overlap + 1e-8)
         order = order[np.where(ious <= iou_threshold)[0] + 1]
-    return prediction[pick]
+    return prediction[pick[:maxDets]]

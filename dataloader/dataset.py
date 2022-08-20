@@ -40,8 +40,9 @@ class Dataset():
         cache_dir = Path(data_path).parent / 'caches'
         save_name = Path(data_path).name.split('.')[0]
          
-        if phase == 'val':
+        if self.phase == 'val':
             self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase, rank=rank)
+
         if rank == 0:
             data_path = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=110)
         else:
@@ -49,7 +50,7 @@ class Dataset():
 
         cache, self.data_info = make_cache_file(cache_dir=cache_dir, file_name=save_name, phase=phase, 
                                                 data_path=data_path, time_created=time_created)
-        assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files" 
+        assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files"
         self.transformer = transformer
 
 
