@@ -1,4 +1,5 @@
 # Ny files
+*.yml
 *.cache
 *.pth
 experiments/*/
