@@ -1,7 +1,7 @@
 # Ny files
 *.yml
 *.cache
-*.pth
+*.pt
 experiments/*/
 
 # Byte-compiled / optimized / DLL files

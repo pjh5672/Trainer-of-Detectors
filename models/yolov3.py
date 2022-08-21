@@ -7,7 +7,7 @@ from yolov3_modules import Darknet53_backbone, YOLOv3_FPN, YOLOv3_head
 
 
 class YOLOv3_Model(nn.Module):
-    def __init__(self, config_path, num_classes, pretrained=True):
+    def __init__(self, config_path, num_classes):
         super().__init__()
     
         with open(config_path) as f:
@@ -18,7 +18,7 @@ class YOLOv3_Model(nn.Module):
         self.num_attribute = 5 + num_classes
         self.num_anchor_per_scale = len(self.anchors[0])
         self.last_dim_channels = self.num_attribute * self.num_anchor_per_scale
-        self.backbone = Darknet53_backbone(pretrained=pretrained)
+        self.backbone = Darknet53_backbone()
         self.fpn = YOLOv3_FPN(last_dim_channels=self.last_dim_channels)
         self.head = YOLOv3_head(input_size=self.input_size, 
                                 num_classes=num_classes, 
@@ -26,9 +26,9 @@ class YOLOv3_Model(nn.Module):
                                 num_anchor_per_scale=self.num_anchor_per_scale)
 
     def forward(self, x):
-        features = self.backbone(x)
-        features = self.fpn(features)
-        predictions = self.head(features)
+        x1, x2, x3 = self.backbone(x)
+        out_l, out_m, out_s = self.fpn(x1, x2, x3)
+        predictions = self.head(out_l, out_m, out_s)
         return predictions
 
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     num_classes = 80
     device = torch.device('cpu')
 
-    model = YOLOv3_Model(config_path=config_path, num_classes=num_classes, pretrained=True)
+    model = YOLOv3_Model(config_path=config_path, num_classes=num_classes)
     model = model.to(device)
     model.eval()
     x = torch.randn(2, 3, 416, 416).to(device)

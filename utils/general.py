@@ -6,7 +6,7 @@ import numpy as np
 
 
 def save_model(model, save_path):
-    torch.save(model.state_dict(), save_path)
+    torch.save(model, save_path)
 
 
 def scale_to_original(bboxes, scale_w, scale_h):

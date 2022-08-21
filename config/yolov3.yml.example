@@ -1,4 +1,4 @@
-WEIGHT_PATH: null
+WEIGHT_PATH: ./weights/yolov3.pt
 
 NUM_EPOCHS: 300
 INPUT_SIZE: 320

@@ -107,6 +107,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
         losses = criterion(predictions, targets)
         predictions = torch.cat(predictions, dim=1)
         predictions[..., 4:] = torch.sigmoid(predictions[..., 4:])
+        predictions[..., 5:] *= predictions[..., 4:5]
 
         for idx in range(len(filenames)):
             filename = filenames[idx]
@@ -168,7 +169,7 @@ def main_work(rank, world_size, args, logger):
 
     if rank == 0:
         logging.warning(f'{train_set.data_info}')
-        logging.warning(f'{val_set.data_info}\n')
+        logging.warning(f'{val_set.data_info}')
 
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
@@ -226,7 +227,7 @@ def main_work(rank, world_size, args, logger):
 
     if config_item['WEIGHT_PATH'] is not None:
         if rank == 0:
-            logging.warning(f'Path to pretrained model: {config_item["WEIGHT_PATH"]}')
+            logging.warning(f'Path to pretrained model: {config_item["WEIGHT_PATH"]}\n')
         map_location = {'cpu':'cuda:%d' %rank}
         ckpt = torch.load(config_item['WEIGHT_PATH'], map_location=map_location)
         if hasattr(model, 'module'):
@@ -274,7 +275,8 @@ def main_work(rank, world_size, args, logger):
                 if mAP_info['all']['mAP_50'] > best_mAP:
                     best_mAP = mAP_info['all']['mAP_50']
                     model_to_save = model.module if hasattr(model, 'module') else model
-                    save_model(model=deepcopy(model_to_save).cpu(), save_path=args.weight_dir / f'weight_EP{epoch:03d}.pth')
+                    model_to_save.class_list = class_list
+                    save_model(model=deepcopy(model_to_save).cpu(), save_path=args.weight_dir / f'weight_EP{epoch:03d}.pt')
 
                     analysis_result = analyse_mAP_info(mAP_info['all'], class_list)
                     data_df, figure_AP, figure_dets, fig_PR_curves = analysis_result
@@ -298,7 +300,7 @@ def main():
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
     parser.add_argument('--gpu_ids', type=int, default=[0], nargs='+', help='List of GPU IDs')
     parser.add_argument('--img_interval', type=int, default=5, help='Image logging interval')
-    parser.add_argument('--start_save', type=int, default=1, help='Starting model saving epoch')
+    parser.add_argument('--start_save', type=int, default=10, help='Starting model saving epoch')
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
 
     args = parser.parse_args()

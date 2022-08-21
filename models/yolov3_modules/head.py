@@ -77,11 +77,10 @@ class YOLOv3_head(nn.Module):
                                   anchors=self.anchor_S,
                                   num_anchor_per_scale=self.num_anchor_per_scale)
 
-    def forward(self, x):
-        P3, P4, P5 = x
-        pred_L = self.head_L(P5)
-        pred_M = self.head_M(P4)
-        pred_S = self.head_S(P3)
+    def forward(self, x1, x2, x3):
+        pred_L = self.head_L(x1)
+        pred_M = self.head_M(x2)
+        pred_S = self.head_S(x3)
         return [pred_L, pred_M, pred_S]
 
 
@@ -109,14 +108,14 @@ if __name__ == "__main__":
     num_attribute =  5 + num_classes
     num_anchor_per_scale = 3
     last_dim_channels = num_attribute * num_anchor_per_scale
-    backbone = Darknet53_backbone(pretrained=True).to(device)
+    backbone = Darknet53_backbone().to(device)
     fpn = YOLOv3_FPN(last_dim_channels=last_dim_channels).to(device)
     head = YOLOv3_head(input_size=input_size, num_classes=80, anchors=anchors, num_anchor_per_scale=num_anchor_per_scale)
 
     with torch.no_grad():
-        features = backbone(x)
-        features = fpn(features)
-        predictions = head(features)
+        x1, x2, x3 = backbone(x)
+        out_l, out_m, out_s = fpn(x1, x2, x3)
+        predictions = head(out_l, out_m, out_s)
 
     for prediction in predictions:
         print(prediction.shape)

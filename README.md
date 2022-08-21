@@ -2,7 +2,7 @@
 
 ## Description
 
-This is repository for source code to train various object detection models. currently, It supports YOLOv3 model training with Darknet53(You can download darknet53 weight from [here](https://drive.google.com/file/d/1VuV0llnEPUGiPq-cKhfSQlKQ7Zg6jlp9/view?usp=sharing))
+This is repository for source code to train various object detection models. currently, It supports pretrained YOLOv3 weight(yolov3.pt) from [here](https://drive.google.com/file/d/1cjVPwnjrQH0zq6aFbRspwM3YDsxno59Z/view?usp=sharing))
 **Prototyping now...**
 
 **COCO2017 Average Precision**
@@ -25,6 +25,7 @@ $ pip install -r requirements.txt --extra-index-url https://download.pytorch.org
 
 | Date | Content |
 |:----:|:-----|
+| 08-21 | add:consider class conditional probability & support yolov3.pt weight |
 | 08-20 | fix:chnage BCELoss -> BCEWithLogitLoss due to stability in case of AMP computation |
 | 08-17 | bug:sanity check for avoiding CUDA runtime error(device-side assert triggered) during training |
 | 08-10 | add:visualize functions for PR curve, AP@0.50, num of detection rate(TP, FP, FN) per class |

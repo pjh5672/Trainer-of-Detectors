@@ -4,61 +4,49 @@ import torch.nn as nn
 from element import ConvLayer
 
 
-
 class TopDownLayer(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, last_dim_channels):
         super().__init__()
-        assert out_channels % 2 == 0
-        self.conv1 = ConvLayer(in_channels, out_channels, 1, stride=1, padding=0)
-        self.conv2 = ConvLayer(out_channels, out_channels*2, 3, stride=1, padding=1)
-        self.conv3 = ConvLayer(out_channels*2, out_channels, 1, stride=1, padding=0)
-        self.conv4 = ConvLayer(out_channels, out_channels*2, 3, stride=1, padding=1)
-        self.conv5 = ConvLayer(out_channels*2, out_channels, 1, stride=1, padding=0)
+        assert out_channels % 2 == 0  #assert out_channels is an even number
+        half_out_channels = out_channels // 2
+        self.conv1 = ConvLayer(in_channels, half_out_channels, 1, stride=1, padding=0)
+        self.conv2 = ConvLayer(half_out_channels, out_channels, 3, stride=1, padding=1)
+        self.conv3 = ConvLayer(out_channels, half_out_channels, 1, stride=1, padding=0)
+        self.conv4 = ConvLayer(half_out_channels, out_channels, 3, stride=1, padding=1)
+        self.conv5 = ConvLayer(out_channels, half_out_channels, 1, stride=1, padding=0)
+        self.conv6 = ConvLayer(half_out_channels, out_channels, 3, stride=1, padding=1)
+        self.conv7 = nn.Conv2d(out_channels, last_dim_channels, 1, stride=1, padding=0, bias=True)
 
     def forward(self, x):
-        out = self.conv1(x)
-        out = self.conv2(out)
-        out = self.conv3(out)
-        out = self.conv4(out)
-        out = self.conv5(out)
+        tmp = self.conv1(x)
+        tmp = self.conv2(tmp)
+        tmp = self.conv3(tmp)
+        tmp = self.conv4(tmp)
+        self.branch = self.conv5(tmp)
+        tmp = self.conv6(self.branch)
+        out = self.conv7(tmp)
         return out
-
 
 
 class YOLOv3_FPN(nn.Module):
     def __init__(self, last_dim_channels):
         super().__init__()
-        self.topdown_1 = TopDownLayer(1024, 512)
-        self.topdown_2 = TopDownLayer(768, 256)
-        self.topdown_3 = TopDownLayer(384, 128)
-        self.lateral_1 = ConvLayer(512, 256, 1, stride=1, padding=0)
-        self.lateral_2 = ConvLayer(256, 128, 1, stride=1, padding=0)
+        self.topdown1 = TopDownLayer(1024, 1024, last_dim_channels)
+        self.conv1 = ConvLayer(512, 256, 1, stride=1, padding=0)
+        self.topdown2 = TopDownLayer(768, 512, last_dim_channels)
+        self.conv2 = ConvLayer(256, 128, 1, stride=1, padding=0)
+        self.topdown3 = TopDownLayer(384, 256, last_dim_channels)
         self.upsample = nn.Upsample(scale_factor=2)
-        self.conv_S = nn.Sequential(
-            ConvLayer(128, 128*2, 3, stride=1, padding=1),
-            nn.Conv2d(128*2, last_dim_channels, 1, stride=1, padding=0)
-        )
-        self.conv_M = nn.Sequential(
-            ConvLayer(256, 256*2, 3, stride=1, padding=1),
-            nn.Conv2d(256*2, last_dim_channels, 1, stride=1, padding=0)
-        )
-        self.conv_L = nn.Sequential(
-            ConvLayer(512, 512*2, 3, stride=1, padding=1),
-            nn.Conv2d(512*2, last_dim_channels, 1, stride=1, padding=0)
-        )
-    
-    def forward(self, x):
-        C3, C4, C5 = x
-        P5 = self.topdown_1(C5)
-        ftr_S = self.conv_L(P5)
-        C4 = torch.cat((self.upsample(P5), self.lateral_1(C4)), dim=1)
-        P4 = self.topdown_2(C4)
-        ftr_M = self.conv_M(P4)
-        C3 = torch.cat((self.upsample(P4), self.lateral_2(C3)), dim=1)
-        P3 = self.topdown_3(C3)
-        ftr_L = self.conv_S(P3)
-        return [ftr_S, ftr_M, ftr_L]
 
+    def forward(self, x1, x2, x3):
+        out1 = self.topdown1(x1)
+        tmp = self.upsample(self.conv1(self.topdown1.branch))
+        tmp = torch.cat((tmp, x2), dim=1)
+        out2 = self.topdown2(tmp)
+        tmp = self.upsample(self.conv2(self.topdown2.branch))
+        tmp = torch.cat((tmp, x3), dim=1)
+        out3 = self.topdown3(tmp)
+        return out1, out2, out3
 
 
 if __name__ == "__main__":
@@ -69,12 +57,12 @@ if __name__ == "__main__":
     num_attribute =  5 + num_classes
     num_anchor_per_scale = 3
     last_dim_channels = num_attribute * num_anchor_per_scale
-    backbone = Darknet53_backbone(pretrained=True)
+    backbone = Darknet53_backbone()
     fpn_module = YOLOv3_FPN(last_dim_channels)
 
     with torch.no_grad():
-        features = backbone(x)
-        features = fpn_module(features)
+        x1, x2, x3 = backbone(x)
+        features = fpn_module(x1, x2, x3)
 
     for feature in features:
         print(feature.shape)
