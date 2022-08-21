@@ -276,7 +276,7 @@ def main_work(rank, world_size, args, logger):
                     best_mAP = mAP_info['all']['mAP_50']
                     model_to_save = model.module if hasattr(model, 'module') else model
                     model_to_save.class_list = class_list
-                    save_model(model=deepcopy(model_to_save).cpu(), save_path=args.weight_dir / f'weight_EP{epoch:03d}.pt')
+                    save_model(model=deepcopy(model_to_save).cpu(), save_path=args.weight_dir / f'EP{epoch:03d}.pt')
 
                     analysis_result = analyse_mAP_info(mAP_info['all'], class_list)
                     data_df, figure_AP, figure_dets, fig_PR_curves = analysis_result
