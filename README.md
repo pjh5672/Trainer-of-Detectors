@@ -2,7 +2,7 @@
 
 ## Description
 
-This is repository for source code to train various object detection models. currently, It supports pretrained YOLOv3 weight(yolov3.pt) from [here](https://drive.google.com/file/d/1cjVPwnjrQH0zq6aFbRspwM3YDsxno59Z/view?usp=sharing))
+This is repository for source code to train various object detection models. currently, It supports pretrained YOLOv3 weight(yolov3.pt) from [here](https://drive.google.com/drive/folders/15qXxbD7RG19uZBhG3NPWwfqt6OdksAPR?usp=sharing)
 **Prototyping now...**
 
 **COCO2017 Average Precision**
