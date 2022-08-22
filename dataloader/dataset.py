@@ -195,7 +195,7 @@ if __name__ == '__main__':
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
 
-    data_path = ROOT / 'data' / 'coco128.yml'
+    data_path = ROOT / 'data' / 'coco128.yaml'
     transformers = build_transformer(input_size=(416, 416))
     train_dset = Dataset(data_path=data_path, phase='train', rank=0, time_created='123', transformer=transformers['train'])
     val_dset = Dataset(data_path=data_path, phase='val', rank=0, time_created='123', transformer=transformers['val'])

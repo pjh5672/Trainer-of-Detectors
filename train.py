@@ -225,19 +225,33 @@ def main_work(rank, world_size, args, logger):
     if OS_SYSTEM == 'Linux':
         dist.barrier() # let all processes sync up before starting
 
-    if config_item['WEIGHT_PATH'] is not None:
+    if config_item['RESUME_PATH'] is not None:
         if rank == 0:
-            logging.warning(f'Path to pretrained model: {config_item["WEIGHT_PATH"]}\n')
+            logging.warning(f'Path to resume model: {config_item["RESUME_PATH"]}\n')
         map_location = {'cpu':'cuda:%d' %rank}
-        ckpt = torch.load(config_item['WEIGHT_PATH'], map_location=map_location)
+        checkpoint = torch.load(config_item['RESUME_PATH'])
+        start_epoch = checkpoint['epoch']
+        model_state_dict = checkpoint['model'].state_dict()
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if hasattr(model, 'module'):
-            model.module.load_state_dict(ckpt, strict=True)
+            model.module.load_state_dict(model_state_dict, strict=True)
         else:
-            model.load_state_dict(ckpt, strict=True)
+            model.load_state_dict(model_state_dict, strict=True)
+    else:
+        start_epoch = 1
+        if config_item['PRETRAINED_PATH'] is not None:
+            if rank == 0:
+                logging.warning(f'Path to pretrained model: {config_item["PRETRAINED_PATH"]}\n')
+            map_location = {'cpu':'cuda:%d' %rank}
+            checkpoint = torch.load(config_item['PRETRAINED_PATH'], map_location=map_location)
+            if hasattr(model, 'module'):
+                model.module.load_state_dict(checkpoint, strict=True)
+            else:
+                model.load_state_dict(checkpoint, strict=True)
 
     #################################### Train Model ####################################
     best_mAP = args.init_score
-    progress_bar = tqdm(range(1, num_epochs+1), ncols=110) if rank == 0 else range(1, num_epochs+1)
+    progress_bar = tqdm(range(start_epoch, num_epochs+1), ncols=110) if rank == 0 else range(start_epoch, num_epochs+1)
 
     for epoch in progress_bar:
         if rank == 0:
@@ -274,9 +288,12 @@ def main_work(rank, world_size, args, logger):
             if epoch >= args.start_save:
                 if mAP_info['all']['mAP_50'] > best_mAP:
                     best_mAP = mAP_info['all']['mAP_50']
-                    model_to_save = model.module if hasattr(model, 'module') else model
+                    model_to_save = deepcopy(model.module).cpu() if hasattr(model, 'module') else deepcopy(model).cpu()
                     model_to_save.class_list = class_list
-                    save_model(model=deepcopy(model_to_save).cpu(), save_path=args.weight_dir / f'EP{epoch:03d}.pt')
+                    save_item = {'epoch': epoch,
+                                 'model': model_to_save,
+                                 'optimizer_state_dict': optimizer.state_dict()}
+                    save_model(model=save_item, save_path=args.weight_dir / f'model_EP{epoch:03d}.pt')
 
                     analysis_result = analyse_mAP_info(mAP_info['all'], class_list)
                     data_df, figure_AP, figure_dets, fig_PR_curves = analysis_result
@@ -295,19 +312,19 @@ def main_work(rank, world_size, args, logger):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='data/coco128.yml', help='Path to data.yml file')
-    parser.add_argument('--config_path', type=str, default='config/yolov3.yml', help='Path to config.yml file')
+    parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='Path to data.yml file')
+    parser.add_argument('--config_path', type=str, default='config/yolov3.yaml', help='Path to config.yml file')
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
     parser.add_argument('--gpu_ids', type=int, default=[0], nargs='+', help='List of GPU IDs')
-    parser.add_argument('--img_interval', type=int, default=5, help='Image logging interval')
-    parser.add_argument('--start_save', type=int, default=10, help='Starting model saving epoch')
+    parser.add_argument('--img_interval', type=int, default=10, help='Image logging interval')
+    parser.add_argument('--start_save', type=int, default=30, help='Starting model saving epoch')
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
     args.config_path = ROOT / args.config_path
     args.exp_path = ROOT / 'experiments' / args.exp_name
-    args.weight_dir = args.exp_path / 'weights'
+    args.weight_dir = args.exp_path / 'models'
     args.image_log_dir = args.exp_path / 'images'
     args.analysis_log_dir = args.exp_path / 'analysis'
 

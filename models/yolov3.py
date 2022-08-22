@@ -39,7 +39,7 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
 
-    config_path = ROOT / 'config' / 'yolov3.yml'
+    config_path = ROOT / 'config' / 'yolov3.yaml'
     num_classes = 80
     device = torch.device('cpu')
 

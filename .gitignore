@@ -1,5 +1,5 @@
 # Ny files
-*.yml
+*.yaml
 *.cache
 *.pt
 experiments/*/

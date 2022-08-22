@@ -168,8 +168,8 @@ class Evaluator():
                 mprec_50 = mprec
                 mrec_50 = mrec
             APs.append(ap)
-            AP_5095 += (self.iouThrs[idx] * ap)
-        AP_5095 /= sum(self.iouThrs)
+            AP_5095 += ap
+        AP_5095 /= len(self.iouThrs)
 
         res = {'class' : class_id,
                 'precision_50' : mprec_50,

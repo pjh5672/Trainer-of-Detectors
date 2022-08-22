@@ -196,8 +196,8 @@ if __name__ == "__main__":
     from dataloader import Dataset, build_transformer
     from models import YOLOv3_Model
 
-    data_path = ROOT / 'data' / 'coco128.yml'
-    config_path = ROOT / 'config' / 'yolov3.yml'
+    data_path = ROOT / 'data' / 'coco128.yaml'
+    config_path = ROOT / 'config' / 'yolov3.yaml'
 
     with open(config_path) as f:
         item = yaml.load(f, Loader=yaml.FullLoader)

@@ -25,6 +25,7 @@ $ pip install -r requirements.txt --extra-index-url https://download.pytorch.org
 
 | Date | Content |
 |:----:|:-----|
+| 08-22 | add:train with resume mode in case of previous models |
 | 08-21 | add:consider class conditional probability & support yolov3.pt weight |
 | 08-20 | fix:chnage BCELoss -> BCEWithLogitLoss due to stability in case of AMP computation |
 | 08-17 | bug:sanity check for avoiding CUDA runtime error(device-side assert triggered) during training |
