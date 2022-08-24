@@ -14,7 +14,7 @@ This is repository for source code to train various object detection models. cur
 
 
 
-## Description
+### Usage
 
 #### 1. Data Config
 
