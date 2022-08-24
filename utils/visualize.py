@@ -56,9 +56,10 @@ def visualize_bbox(image, label, class_list, color_list,
 
 def visualize(image, label, class_list, color_list, show_class=False, show_score=False):
     canvas = image.copy()
-    for item in label:
-        canvas = visualize_bbox(canvas, item, class_list, color_list, show_class=show_class, show_score=show_score)
-    return canvas
+    if len(label) > 0:
+        for item in label:
+            canvas = visualize_bbox(canvas, item, class_list, color_list, show_class=show_class, show_score=show_score)
+    return canvas[..., ::-1]
 
 
 def visualize_prediction(tensor_image, detection, conf_threshold, class_list, color_list):
@@ -68,7 +69,7 @@ def visualize_prediction(tensor_image, detection, conf_threshold, class_list, co
     pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
     pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
     canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)
-    return canvas[...,::-1]
+    return canvas
 
 
 def visualize_target(tensor_image, target, class_list, color_list):
@@ -78,7 +79,7 @@ def visualize_target(tensor_image, target, class_list, color_list):
     target_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(target_voc[:, 1:5])
     target_voc[:, 1:5] = scale_to_original(target_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
     canvas = visualize(canvas, target_voc, class_list, color_list, show_class=True, show_score=False)
-    return canvas[...,::-1]
+    return canvas
 
 
 def show_values(axs, orient='h', space=0.005, mode='ap'):
@@ -155,7 +156,7 @@ def visualize_PR_curve_per_class(pr_pts_per_class, class_list):
     
 
 def sort_dict(values_per_class):
-        return dict(sorted(values_per_class.items()))
+    return dict(sorted(values_per_class.items()))
 
 
 def analyse_mAP_info(mAP_info_area, class_list):

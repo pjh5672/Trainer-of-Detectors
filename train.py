@@ -231,12 +231,11 @@ def main_work(rank, world_size, args, logger):
         map_location = {'cpu':'cuda:%d' %rank}
         checkpoint = torch.load(config_item['RESUME_PATH'])
         start_epoch = checkpoint['epoch']
-        model_state_dict = checkpoint['model'].state_dict()
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if hasattr(model, 'module'):
-            model.module.load_state_dict(model_state_dict, strict=True)
+            model.module.load_state_dict(checkpoint['model_state_dict'], strict=True)
         else:
-            model.load_state_dict(model_state_dict, strict=True)
+            model.load_state_dict(checkpoint['model_state_dict'], strict=True)
     else:
         start_epoch = 1
         if config_item['PRETRAINED_PATH'] is not None:
@@ -291,7 +290,8 @@ def main_work(rank, world_size, args, logger):
                     model_to_save = deepcopy(model.module).cpu() if hasattr(model, 'module') else deepcopy(model).cpu()
                     model_to_save.class_list = class_list
                     save_item = {'epoch': epoch,
-                                 'model': model_to_save,
+                                 'class_list': class_list,
+                                 'model_state_dict': model_to_save.state_dict(),
                                  'optimizer_state_dict': optimizer.state_dict()}
                     save_model(model=save_item, save_path=args.weight_dir / f'model_EP{epoch:03d}.pt')
 
