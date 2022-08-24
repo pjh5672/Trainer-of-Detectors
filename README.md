@@ -128,7 +128,7 @@ train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name tr
 
 - **Third-party package library Installation (with CUDA11.3)**
 ```bash
-$ pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu113
+$ pip install -r requirements.txt
 ```
 
 ## Update
