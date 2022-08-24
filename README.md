@@ -160,7 +160,7 @@ $ pip install -r requirements.txt
 
 </details>
 
-## Contact
 
+## Contact
 - Author: Jiho Park  
 - Email: pjh5672.dev@gmail.com  
