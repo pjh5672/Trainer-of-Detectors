@@ -51,7 +51,9 @@ This is repository for source code to train various object detection models. cur
     - **start_save** : starting model saving epoch
     - **init_score** : initial mAP score for update best model
     - **adam** : use of Adam optimizer(default:SGD optimizer)
-    - **linear_lr** : use of linear LR scheduler(default:one cyclic scheduler)  
+    - **linear_lr** : use of linear LR scheduler(default:one cyclic scheduler)
+    - **no_amp** : use of FP32 training without AMP(default:AMP training)
+
 
 ```python
 # simple example on parallel training on 2 GPUs

@@ -64,7 +64,7 @@ def execute_train(rank, world_size, dataloader, model, criterion, optimizer, sca
         images = mini_batch[0].cuda(rank, non_blocking=True)
         targets = mini_batch[1]
 
-        with amp.autocast(enabled=True):
+        with amp.autocast(enabled=args.no_amp):
             predictions = model(images)
             losses = criterion(predictions, targets)
 
@@ -213,7 +213,7 @@ def main_work(rank, world_size, args, logger):
     else:
         lf = lambda x: ((1 - math.cos(x * math.pi / num_epochs)) / 2) * (lrf - 1) + 1
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
-    scaler = amp.GradScaler(enabled=True)
+    scaler = amp.GradScaler(enabled=args.no_amp)
 
     ################################### Init Process ###################################
     setup(rank, world_size)
@@ -357,6 +357,7 @@ def main():
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
     parser.add_argument('--adam', action='store_true', help='use of Adam optimizer(default:SGD optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler(default:one cyclic scheduler)')
+    parser.add_argument('--no_amp', action='store_false', help='use of FP32 training without AMP(default:AMP training)')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
