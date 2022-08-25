@@ -50,7 +50,7 @@ def cleanup():
         dist.destroy_process_group()
 
 
-def execute_train(rank, world_size, dataloader, model, criterion, optimizer, scaler, class_list, color_list):
+def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, class_list, color_list):
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
     total_loss = 0.0
     count_non_inf = 0
@@ -64,11 +64,11 @@ def execute_train(rank, world_size, dataloader, model, criterion, optimizer, sca
         images = mini_batch[0].cuda(rank, non_blocking=True)
         targets = mini_batch[1]
 
-        with amp.autocast(enabled=args.no_amp):
+        with amp.autocast(enabled=not args.no_amp):
             predictions = model(images)
             losses = criterion(predictions, targets)
 
-        scaler.scale(losses[0] * world_size).backward()
+        scaler.scale(losses[0]).backward()
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
@@ -213,7 +213,7 @@ def main_work(rank, world_size, args, logger):
     else:
         lf = lambda x: ((1 - math.cos(x * math.pi / num_epochs)) / 2) * (lrf - 1) + 1
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
-    scaler = amp.GradScaler(enabled=args.no_amp)
+    scaler = amp.GradScaler(enabled=not args.no_amp)
 
     ################################### Init Process ###################################
     setup(rank, world_size)
@@ -268,6 +268,7 @@ def main_work(rank, world_size, args, logger):
         checkpoint = torch.load(config_item['RESUME_PATH'])
         start_epoch = checkpoint['epoch']
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        scaler.load_state_dict(checkpoint['scaler_state_dict'])
         if hasattr(model, 'module'):
             model.module.load_state_dict(checkpoint['model_state_dict'], strict=True)
         else:
@@ -296,9 +297,10 @@ def main_work(rank, world_size, args, logger):
             val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=110, leave=False)
 
         train_sampler.set_epoch(epoch)
-        train_loss, canvas_train = execute_train(rank=rank, world_size=world_size, dataloader=train_loader,
-                                                 model=model, criterion=criterion, optimizer=optimizer,
-                                                 scaler=scaler, class_list=class_list, color_list=color_list)
+
+        train_loss, canvas_train = execute_train(rank=rank, args=args, dataloader=train_loader, model=model,
+                                                 criterion=criterion, optimizer=optimizer, scaler=scaler,
+                                                 class_list=class_list, color_list=color_list)
         val_loss, gather_objects, canvas_val = execute_val(rank=rank, world_size=world_size, config=config_item,
                                                            dataloader=val_loader, model=model, criterion=criterion,
                                                            class_list=class_list, color_list=color_list)
@@ -328,7 +330,8 @@ def main_work(rank, world_size, args, logger):
                     save_item = {'epoch': epoch,
                                  'class_list': class_list,
                                  'model_state_dict': model_to_save.state_dict(),
-                                 'optimizer_state_dict': optimizer.state_dict()}
+                                 'optimizer_state_dict': optimizer.state_dict(),
+                                 'scaler_state_dict': scaler.state_dict()}
                     save_model(model=save_item, save_path=args.weight_dir / f'model_EP{epoch:03d}.pt')
 
                     analysis_result = analyse_mAP_info(mAP_info['all'], class_list)
@@ -357,7 +360,7 @@ def main():
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
     parser.add_argument('--adam', action='store_true', help='use of Adam optimizer(default:SGD optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler(default:one cyclic scheduler)')
-    parser.add_argument('--no_amp', action='store_false', help='use of FP32 training without AMP(default:AMP training)')
+    parser.add_argument('--no_amp', action='store_true', help='use of FP32 training(default:AMP training)')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
