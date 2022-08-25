@@ -55,7 +55,7 @@ This is repository for source code to train various object detection models. cur
 
 ```python
 # simple example on parallel training on 2 GPUs
-train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name train --gpu_ids 0 1
+train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name train --world_size 2
 ```
 
 
