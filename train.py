@@ -1,5 +1,6 @@
 import os
 import time
+import math
 import shutil
 import logging
 import platform
@@ -10,10 +11,12 @@ from datetime import datetime, timedelta
 
 import yaml
 import torch
-import torch.optim as optim
+from torch import nn
+from torch.cuda import amp
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.backends.cudnn as cudnn
+from torch.optim import SGD, Adam, lr_scheduler
 from torch.utils.data import DataLoader, distributed
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tqdm import tqdm
@@ -47,9 +50,10 @@ def cleanup():
         dist.destroy_process_group()
 
 
-def execute_train(rank, dataloader, model, criterion, optimizer, class_list, color_list):
+def execute_train(rank, world_size, dataloader, model, criterion, optimizer, scaler, class_list, color_list):
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
     total_loss = 0.0
+    count_non_inf = 0
     model.train()
 
     for index, mini_batch in enumerate(dataloader):
@@ -60,22 +64,27 @@ def execute_train(rank, dataloader, model, criterion, optimizer, class_list, col
         images = mini_batch[0].cuda(rank, non_blocking=True)
         targets = mini_batch[1]
 
-        predictions = model(images)
-        losses = criterion(predictions, targets)
+        with amp.autocast(enabled=True):
+            predictions = model(images)
+            losses = criterion(predictions, targets)
+
+        scaler.scale(losses[0] * world_size).backward()
+        scaler.step(optimizer)
+        scaler.update()
         optimizer.zero_grad()
-        losses[0].backward()
-        optimizer.step()
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
             if loss_name == 'total':
-                total_loss += loss_value
+                if not torch.isinf(loss_value):
+                    total_loss += loss_value
+                    count_non_inf += 1
             else:
                 monitor_text += f'{loss_name}: {loss_value.item():.2f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
 
-    total_loss /= len(dataloader)
+    total_loss /= count_non_inf
 
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
@@ -90,6 +99,7 @@ def execute_train(rank, dataloader, model, criterion, optimizer, class_list, col
 def execute_val(rank, world_size, config, dataloader, model, criterion, class_list, color_list):
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
     total_loss = 0.0
+    count_non_inf = 0
     gather_objects = [None, ] * world_size
     detections = []
     model.eval()
@@ -122,13 +132,15 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
             if loss_name == 'total':
-                total_loss += loss_value
+                if not torch.isinf(loss_value):
+                    total_loss += loss_value
+                    count_non_inf += 1
             else:
                 monitor_text += f'{loss_name}: {loss_value.item():.2f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
 
-    total_loss /= len(dataloader)
+    total_loss /= count_non_inf
 
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
@@ -156,12 +168,14 @@ def main_work(rank, world_size, args, logger):
 
     input_size = config_item['INPUT_SIZE']
     class_list = data_item['NAMES']
-    init_lr = config_item['INIT_LEARNING_RATE']
+    lr0 = config_item['INIT_LEARNING_RATE']
+    lrf = config_item['FINAL_LEARNING_RATE']
     weight_decay = config_item['WEIGHT_DECAY']
     num_epochs = config_item['NUM_EPOCHS']
     augment_strong = config_item['AUGMENT_STRONG']
     batch_size = config_item['BATCH_SIZE']
-    lrf = config_item['LEARNING_RATE_SCALE']
+    momentum = config_item['MOMENTUM']
+
     color_list = generate_random_color(num_colors=len(class_list))
     transformer = build_transformer(input_size=(input_size, input_size), augment_strong=augment_strong)
     train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=transformer['train'])
@@ -173,11 +187,33 @@ def main_work(rank, world_size, args, logger):
 
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
-    optimizer = optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=init_lr, weight_decay=weight_decay)
+
+    g0, g1, g2 = [], [], []
+    for v in model.modules():
+        if isinstance(v, nn.BatchNorm2d):
+            g0.append(v.weight)
+        elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):
+            g1.append(v.weight)
+        if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):
+            g2.append(v.bias)
+
+    if args.adam:
+        optimizer = Adam(params=g0, lr=lr0, betas=(momentum, 0.999))
+    else:
+        optimizer = SGD(params=g0, lr=lr0, momentum=momentum, nesterov=True)
+    optimizer.add_param_group({'params': g1, 'weight_decay': weight_decay})
+    optimizer.add_param_group({'params': g2})
+    del g0, g1, g2
+
     val_file = args.data_path.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, config=config_item)
-    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda x: 1 - 10 ** (lrf * (1 - x / num_epochs)))
+    if args.linear_lr:
+        lf = lambda x: (1 - x / (num_epochs - 1)) * (1.0 - lrf) + lrf
+    else:
+        lf = lambda x: ((1 - math.cos(x * math.pi / num_epochs)) / 2) * (lrf - 1) + 1
+    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+    scaler = amp.GradScaler(enabled=True)
 
     ################################### Init Process ###################################
     setup(rank, world_size)
@@ -260,9 +296,9 @@ def main_work(rank, world_size, args, logger):
             val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=110, leave=False)
 
         train_sampler.set_epoch(epoch)
-        train_loss, canvas_train = execute_train(rank=rank, dataloader=train_loader, model=model,
-                                                 criterion=criterion, optimizer=optimizer,
-                                                 class_list=class_list, color_list=color_list)
+        train_loss, canvas_train = execute_train(rank=rank, world_size=world_size, dataloader=train_loader,
+                                                 model=model, criterion=criterion, optimizer=optimizer,
+                                                 scaler=scaler, class_list=class_list, color_list=color_list)
         val_loss, gather_objects, canvas_val = execute_val(rank=rank, world_size=world_size, config=config_item,
                                                            dataloader=val_loader, model=model, criterion=criterion,
                                                            class_list=class_list, color_list=color_list)
@@ -315,10 +351,12 @@ def main():
     parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='Path to data.yml file')
     parser.add_argument('--config_path', type=str, default='config/yolov3.yaml', help='Path to config.yml file')
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
-    parser.add_argument('--gpu_ids', type=int, default=[0], nargs='+', help='List of GPU IDs')
+    parser.add_argument('--world_size', type=int, default=1, help='Number of available GPU devices')
     parser.add_argument('--img_interval', type=int, default=10, help='Image logging interval')
     parser.add_argument('--start_save', type=int, default=30, help='Starting model saving epoch')
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
+    parser.add_argument('--adam', action='store_true', help='use of Adam optimizer(default:SGD optimizer)')
+    parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler(default:one cyclic scheduler)')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
@@ -327,19 +365,25 @@ def main():
     args.weight_dir = args.exp_path / 'models'
     args.image_log_dir = args.exp_path / 'images'
     args.analysis_log_dir = args.exp_path / 'analysis'
+    assert args.world_size > 0, 'Executable GPU machine does not exist, This training supports on CUDA available environment.'
 
     os.makedirs(args.weight_dir, exist_ok=True)
     os.makedirs(args.image_log_dir / 'train', exist_ok=True)
     os.makedirs(args.image_log_dir / 'val', exist_ok=True)
     os.makedirs(args.analysis_log_dir, exist_ok=True)
-    world_size = len(args.gpu_ids)
-    assert world_size > 0, 'Executable GPU machine does not exist, This training supports on CUDA available environment.'
+
+    with open(args.exp_path / 'args.yaml', mode='w') as f:
+        args_dict = {}
+        for k, v in vars(args).items():
+            args_dict[k] = str(v) if isinstance(v, Path) else v
+        yaml.safe_dump(args_dict, f, sort_keys=False)
 
     #########################################################
     # Set multiprocessing type to spawn
     torch.multiprocessing.set_start_method('spawn', force=True)
     logger = setup_primary_logging(args.exp_path / 'train.log')
-    mp.spawn(main_work, args=(world_size, args, logger), nprocs=world_size, join=True)
+    mp.spawn(main_work, args=(args.world_size, args, logger), nprocs=args.world_size, join=True)
+
     #########################################################
 
 if __name__ == '__main__':

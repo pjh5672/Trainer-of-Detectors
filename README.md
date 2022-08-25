@@ -35,7 +35,7 @@ This is repository for source code to train various object detection models. cur
     - **NUM_EPOCHS** : number of epochs to train the model
     - **INPUT_SIZE** : size of input image to be used for model calculation
     - **BATCH_SIZE** : size of the mini-batch to be calculated during one iteration of training
-    (...skipped)
+    (...see *.yaml.example file for more details)
 
 
 ## Usage
@@ -46,10 +46,12 @@ This is repository for source code to train various object detection models. cur
     - **data_path** : path to data.yml file
     - **config_path** : path to config.yml file
     - **exp_name** : name to log training
-    - **gpu_ids** : list of GPU IDs
+    - **world_size** : Number of available GPU devices
     - **img_interval** : image logging interval
     - **start_save** : starting model saving epoch
-    - **init_score** : initial mAP score for update best model    
+    - **init_score** : initial mAP score for update best model
+    - **adam** : use of Adam optimizer(default:SGD optimizer)
+    - **linear_lr** : use of linear LR scheduler(default:one cyclic scheduler)  
 
 ```python
 # simple example on parallel training on 2 GPUs
@@ -138,6 +140,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 08-25 | add:automatic mixed precision applied |
 | 08-24 | add:update README.md file |
 | 08-22 | add:train with resume mode in case of previous models |
 | 08-21 | add:consider class conditional probability & support yolov3.pt weight |
