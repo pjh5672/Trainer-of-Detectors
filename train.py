@@ -197,10 +197,10 @@ def main_work(rank, world_size, args, logger):
         if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):
             g2.append(v.bias)
 
-    if args.adam:
-        optimizer = Adam(params=g0, lr=lr0, betas=(momentum, 0.999))
-    else:
+    if args.sgd:
         optimizer = SGD(params=g0, lr=lr0, momentum=momentum, nesterov=True)
+    else:
+        optimizer = Adam(params=g0, lr=lr0, betas=(momentum, 0.999))
     optimizer.add_param_group({'params': g1, 'weight_decay': weight_decay})
     optimizer.add_param_group({'params': g2})
     del g0, g1, g2
@@ -358,7 +358,7 @@ def main():
     parser.add_argument('--img_interval', type=int, default=10, help='Image logging interval')
     parser.add_argument('--start_save', type=int, default=30, help='Starting model saving epoch')
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
-    parser.add_argument('--adam', action='store_true', help='use of Adam optimizer(default:SGD optimizer)')
+    parser.add_argument('--sgd', action='store_true', help='use of SGD optimizer(default:Adam optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler(default:one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training(default:AMP training)')
 
