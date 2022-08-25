@@ -140,7 +140,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
-| 08-25 | add:automatic mixed precision applied |
+| 08-25 | add:automatic mixed precision applied & log argument command function |
 | 08-24 | add:update README.md file |
 | 08-22 | add:train with resume mode in case of previous models |
 | 08-21 | add:consider class conditional probability & support yolov3.pt weight |
