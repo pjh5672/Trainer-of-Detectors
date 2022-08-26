@@ -5,8 +5,8 @@ import shutil
 import logging
 import platform
 import argparse
-from copy import deepcopy
 from pathlib import Path
+from copy import deepcopy
 from datetime import datetime, timedelta
 
 import yaml
@@ -15,10 +15,11 @@ from torch import nn
 from torch.cuda import amp
 import torch.distributed as dist
 import torch.multiprocessing as mp
-import torch.backends.cudnn as cudnn
+from torch.backends import cudnn
 from torch.optim import SGD, Adam, lr_scheduler
 from torch.utils.data import DataLoader, distributed
 from torch.nn.parallel import DistributedDataParallel as DDP
+from thop import profile
 from tqdm import tqdm
 
 from dataloader import Dataset, build_transformer
@@ -167,6 +168,7 @@ def main_work(rank, world_size, args, logger):
         config_item = yaml.load(f, Loader=yaml.FullLoader)
 
     input_size = config_item['INPUT_SIZE']
+    input_ch = config_item['INPUT_CHANNEL']
     class_list = data_item['NAMES']
     lr0 = config_item['INIT_LEARNING_RATE']
     lrf = config_item['FINAL_LEARNING_RATE']
@@ -180,13 +182,14 @@ def main_work(rank, world_size, args, logger):
     transformer = build_transformer(input_size=(input_size, input_size), augment_strong=augment_strong)
     train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=transformer['train'])
     val_set = Dataset(data_path=args.data_path, phase='val', rank=rank, time_created=TIMESTAMP, transformer=transformer['val'])
+    model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
+    criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
 
     if rank == 0:
         logging.warning(f'{train_set.data_info}')
         logging.warning(f'{val_set.data_info}')
-
-    model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
-    criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
+        macs, params = profile(deepcopy(model), inputs=(torch.randn(1, input_ch, input_size, input_size),), verbose=False)
+        logging.warning(f'Params(M): {params/1e+6:.2f}, FLOPS(B): {2*macs/1E+9:.2f}')
 
     g0, g1, g2 = [], [], []
     for v in model.modules():
@@ -244,7 +247,7 @@ def main_work(rank, world_size, args, logger):
             dist.all_reduce(total_n_target, op=dist.ReduceOp.SUM)
 
         if rank == 0:
-            message = f'Best Possible Rate: {total_n_train/total_n_target:.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}\n'
+            message = f'Best Possible Rate: {total_n_train/total_n_target:.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}'
             logging.warning(message)
 
         del dataloader
@@ -351,16 +354,16 @@ def main_work(rank, world_size, args, logger):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='Path to data.yml file')
-    parser.add_argument('--config_path', type=str, default='config/yolov3.yaml', help='Path to config.yml file')
+    parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='Path to data.yaml file')
+    parser.add_argument('--config_path', type=str, default='config/yolov3.yaml', help='Path to config.yaml file')
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
     parser.add_argument('--world_size', type=int, default=1, help='Number of available GPU devices')
     parser.add_argument('--img_interval', type=int, default=10, help='Image logging interval')
     parser.add_argument('--start_save', type=int, default=30, help='Starting model saving epoch')
     parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
-    parser.add_argument('--sgd', action='store_true', help='use of SGD optimizer(default:Adam optimizer)')
-    parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler(default:one cyclic scheduler)')
-    parser.add_argument('--no_amp', action='store_true', help='use of FP32 training(default:AMP training)')
+    parser.add_argument('--sgd', action='store_true', help='use of SGD optimizer (default: Adam optimizer)')
+    parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
+    parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path

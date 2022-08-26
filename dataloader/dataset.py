@@ -32,7 +32,7 @@ class Dataset():
         self.image_paths = []
         for sub_dir in data_item[self.phase.upper()]:
             image_dir = self.data_dir / sub_dir
-            self.image_paths += [str(image_dir / fn) for fn in os.listdir(image_dir) if fn.lower().endswith(('png','jpg','jpeg'))]
+            self.image_paths += [str(image_dir / fn) for fn in os.listdir(image_dir) if fn.lower().endswith(('png', 'jpg', 'jpeg'))]
         self.label_paths = self.replace_image2label_paths(self.image_paths)
         self.generate_no_label(self.label_paths)
 

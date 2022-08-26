@@ -6,21 +6,21 @@ This is repository for source code to train various object detection models. cur
 
  - **COCO2017 Average Precision** (sanity check of training code - target model: YOLOv3)
 
-| Model | size<sup>(pixels) | mAP<sup>0.5:0.95 | mAP<sup>0.5 |
-| :---: | :---: | :---: | :---: | 
-| YOLOv3(paper) | 320 x 320 | 28.7 | 51.8 |
-| YOLOv3(paper) | 416 x 416 | 31.2 | 55.4 |
-| YOLOv3(paper) | 512 x 512 | 32.7 | 57.7 |
+| Model | size<sup>(pixels) | mAP<sup>0.5:0.95 | mAP<sup>0.5 | Params(M) | FLOPS(B) |
+| :---: | :---: | :---: | :---: | :---: | :---: | 
+| YOLOv3(paper) | 320 x 320 | 28.7 | 51.8 | 61.95 | 39.15 |
+| YOLOv3(paper) | 416 x 416 | 31.2 | 55.4 | 61.95 | 66.17 |
+| YOLOv3(paper) | 512 x 512 | 32.7 | 57.7 | 61.95 | 100.24 |
 
 
 
-### Usage
+## Description
 
 #### 1. Data Config
 
  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
  - **`*.yaml` Arguments**
-    - **Path** : path to the directory containing the dataset
+    - **PATH** : path to the directory containing the dataset
     - **TRAIN** : path where training images are stored
     - **VAL** : path where the image for verification is stored
     - **mAP_FILE** : path of verification data file to be loaded for mAP metric calculation (automatically created when verification data is first loaded)
@@ -33,8 +33,9 @@ This is repository for source code to train various object detection models. cur
     - **RESUME_PATH** : checkpoint path to be loaded when continuing training on a model that has stopped training (ckechpoint consists of model_state_dict, optimizer_state_dict, epoch)
     - **PRETRAINED_PATH** : path of pre-trained weights file (only model_state_dict is wrapped)
     - **NUM_EPOCHS** : number of epochs to train the model
-    - **INPUT_SIZE** : size of input image to be used for model calculation
-    - **BATCH_SIZE** : size of the mini-batch to be calculated during one iteration of training
+    - **INPUT_SIZE** : size of input image (H,W) to be used for model calculation
+    - **INPUT_CHANNEL** : size of input channel to be used for model calculation
+    - **BATCH_SIZE** : size of the mini-batch to be calculated during one iteration of training  
     (...see *.yaml.example file for more details)
 
 
@@ -43,17 +44,16 @@ This is repository for source code to train various object detection models. cur
 #### 1. Train Detector
 
  - **Train Arguments**
-    - **data_path** : path to data.yml file
-    - **config_path** : path to config.yml file
+    - **data_path** : path to data.yaml file
+    - **config_path** : path to config.yaml file
     - **exp_name** : name to log training
-    - **world_size** : Number of available GPU devices
+    - **world_size** : number of available GPU devices
     - **img_interval** : image logging interval
     - **start_save** : starting model saving epoch
     - **init_score** : initial mAP score for update best model
-    - **sgd** : use of SGD optimizer(default:Adam optimizer)
-    - **linear_lr** : use of linear LR scheduler(default:one cyclic scheduler)
-    - **no_amp** : use of FP32 training without AMP(default:AMP training)
-
+    - **sgd** : use of SGD optimizer (default: Adam optimizer)
+    - **linear_lr** : use of linear LR scheduler (default: one cyclic scheduler)
+    - **no_amp** : use of FP32 training without AMP (default: AMP training)
 
 ```python
 # simple example on parallel training on 2 GPUs
@@ -67,6 +67,7 @@ train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name tr
 ```log
 2022-08-23 13:41:49 | Rank 0 | [TRAIN] hash: 19314466396 version: 2022-08-04_18-17 
 2022-08-23 13:41:49 | Rank 0 | [VAL] hash: 814705164 version: 2022-08-04_18-17 
+2022-08-23 13:41:53 | Rank 0 | Params(M): 61.95, FLOPS(B): 66.17
 2022-08-23 13:41:53 | Rank 0 | Path to pretrained model: ./weights/yolov3.pt
 
 2022-08-23 14:05:38 | Rank 0 | [Epoch:001/300] Train Loss: 173.23, Val Loss: 179.45
@@ -142,6 +143,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 08-26 | add:add logging function for model parameters & FLOPS |
 | 08-25 | add:automatic mixed precision applied & log argument command function |
 | 08-24 | add:update README.md file |
 | 08-22 | add:train with resume mode in case of previous models |
