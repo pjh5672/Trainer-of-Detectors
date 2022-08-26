@@ -143,7 +143,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
-| 08-26 | add:add logging function for model parameters & FLOPS |
+| 08-26 | add:logging function for model parameters & FLOPS |
 | 08-25 | add:automatic mixed precision applied & log argument command function |
 | 08-24 | add:update README.md file |
 | 08-22 | add:train with resume mode in case of previous models |
