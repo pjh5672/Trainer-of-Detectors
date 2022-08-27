@@ -3,7 +3,6 @@ import torch.nn as nn
 
 
 
-
 class DetectLayer(nn.Module):
     def __init__(self, input_size, num_classes, anchors, num_anchor_per_scale):
         super().__init__()
@@ -95,7 +94,7 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[2]
 
-    with open(ROOT / 'config' / 'yolov3.yml') as f:
+    with open(ROOT / 'config' / 'yolov3.yaml') as f:
         item = yaml.load(f, Loader=yaml.FullLoader)
 
     input_size = item['INPUT_SIZE']
