@@ -149,8 +149,9 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
-    min_conf_thresh = 0.1 # just for checking val result
-    canvas = visualize_prediction(canvas_img, detections[0][1], min_conf_thresh, class_list, color_list) if rank == 0 else None
+    if rank == 0:
+        canvas = visualize_prediction(canvas_img, detections[0][1], 0.1, class_list, color_list) if len(detections) > 0 else canvas_img[..., ::-1]
+
     del images, predictions, losses
     torch.cuda.empty_cache()
     return total_loss, gather_objects, canvas
@@ -322,8 +323,10 @@ def main_work(rank, world_size, args, logger):
             logging.warning(eval_text)
 
             if epoch % args.img_interval == 0:
-                imwrite(str(args.image_log_dir / 'train' / f'EP{epoch:03d}.jpg'), canvas_train)
-                imwrite(str(args.image_log_dir / 'val' / f'EP{epoch:03d}.jpg'), canvas_val)
+                if canvas_train is not None:
+                    imwrite(str(args.image_log_dir / 'train' / f'EP{epoch:03d}.jpg'), canvas_train)
+                if canvas_val is not None:
+                    imwrite(str(args.image_log_dir / 'val' / f'EP{epoch:03d}.jpg'), canvas_val)
 
             if epoch >= args.start_save:
                 if mAP_info['all']['mAP_50'] > best_mAP:

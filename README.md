@@ -143,6 +143,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 08-27 | add:exception visualize condition in case of detection nothing |
 | 08-26 | add:logging function for model parameters & FLOPS |
 | 08-25 | add:automatic mixed precision applied & log argument command function |
 | 08-24 | add:update README.md file |
