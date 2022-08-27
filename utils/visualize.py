@@ -35,30 +35,29 @@ def generate_random_color(num_colors):
     return color_list
 
 
-def visualize_bbox(image, label, class_list, color_list, 
-                   show_class=False, show_score=False, fontscale=0.7, thickness=2):
+def visualize_bbox(image, label, class_list, color_list, show_class=False, show_score=False, fontscale=0.7, thickness=2):
     class_id = int(label[0])
-    x_min, y_min, x_max, y_max = list(map(int, label[1:5]))
-    color = color_list[class_id]
-    cv2.rectangle(image, (x_min, y_min), (x_max, y_max), color=color, thickness=thickness)
+    if class_id > 0:
+        color = color_list[class_id]
+        x_min, y_min, x_max, y_max = list(map(int, label[1:5]))
+        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), color=color, thickness=thickness)
 
-    if show_class:
-        class_name = class_list[class_id]
-        if show_score:
-            class_name += f'({label[-1]*100:.0f}%)'
+        if show_class:
+            class_name = class_list[class_id]
+            if show_score:
+                class_name += f'({label[-1]*100:.0f}%)'
 
-        ((text_width, text_height), _) = cv2.getTextSize(class_name, cv2.FONT_HERSHEY_SIMPLEX, fontscale, 2)
-        cv2.rectangle(image, (x_min, y_min - int(fontscale*2 * text_height)), (x_min + text_width, y_min), color, -1)
-        cv2.putText(image, text=class_name, org=(x_min, y_min - int((1-fontscale) * text_height)),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=fontscale, color=TEXT_COLOR, lineType=cv2.LINE_AA)
+            ((text_width, text_height), _) = cv2.getTextSize(class_name, cv2.FONT_HERSHEY_SIMPLEX, fontscale, 2)
+            cv2.rectangle(image, (x_min, y_min - int(fontscale*2 * text_height)), (x_min + text_width, y_min), color, -1)
+            cv2.putText(image, text=class_name, org=(x_min, y_min - int((1-fontscale) * text_height)),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=fontscale, color=TEXT_COLOR, lineType=cv2.LINE_AA)
     return image
     
 
 def visualize(image, label, class_list, color_list, show_class=False, show_score=False):
     canvas = image.copy()
-    if len(label) > 0:
-        for item in label:
-            canvas = visualize_bbox(canvas, item, class_list, color_list, show_class=show_class, show_score=show_score)
+    for item in label:
+        canvas = visualize_bbox(canvas, item, class_list, color_list, show_class=show_class, show_score=show_score)
     return canvas
 
 
@@ -66,9 +65,10 @@ def visualize_prediction(tensor_image, detection, conf_threshold, class_list, co
     input_size = tensor_image.shape[-1]
     canvas = denormalize(tensor_image)
     pred_voc = detection[detection[:, 5] >= conf_threshold].copy()
-    pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
-    pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
-    canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)
+    if len(pred_voc) > 0:
+        pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
+        pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
+        canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)
     return canvas[...,::-1]
 
 

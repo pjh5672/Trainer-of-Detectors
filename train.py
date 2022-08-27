@@ -150,7 +150,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
         gather_objects = [detections]
 
     if rank == 0:
-        canvas = visualize_prediction(canvas_img, detections[0][1], 0.1, class_list, color_list) if len(detections) > 0 else canvas_img[..., ::-1]
+        canvas = visualize_prediction(canvas_img, detections[0][1], 0.1, class_list, color_list)
 
     del images, predictions, losses
     torch.cuda.empty_cache()
@@ -268,7 +268,6 @@ def main_work(rank, world_size, args, logger):
     if config_item['RESUME_PATH'] is not None:
         if rank == 0:
             logging.warning(f'Path to resume model: {config_item["RESUME_PATH"]}\n')
-        map_location = {'cpu':'cuda:%d' %rank}
         checkpoint = torch.load(config_item['RESUME_PATH'])
         start_epoch = checkpoint['epoch']
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
