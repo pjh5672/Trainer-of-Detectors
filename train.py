@@ -250,7 +250,6 @@ def main_work(rank, world_size, args, logger):
         if rank == 0:
             message = f'Best Possible Rate: {total_n_train/total_n_target:.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}'
             logging.warning(message)
-
         del dataloader
 
     #################################### Init Model ####################################
@@ -300,7 +299,6 @@ def main_work(rank, world_size, args, logger):
             val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=110, leave=False)
 
         train_sampler.set_epoch(epoch)
-
         train_loss, canvas_train = execute_train(rank=rank, args=args, dataloader=train_loader, model=model,
                                                  criterion=criterion, optimizer=optimizer, scaler=scaler,
                                                  class_list=class_list, color_list=color_list)
@@ -349,6 +347,8 @@ def main_work(rank, world_size, args, logger):
                     os.makedirs(PR_curve_dir, exist_ok=True)
                     for class_id in fig_PR_curves.keys():
                         fig_PR_curves[class_id].savefig(str(PR_curve_dir / f'{class_list[class_id]}.png'))
+                        fig_PR_curves[class_id].clf()
+
     if rank == 0:
         logging.warning(f' Best mAP@0.5: {best_mAP:.3f}')
     cleanup()
@@ -389,9 +389,13 @@ def main():
 
     #########################################################
     # Set multiprocessing type to spawn
-    torch.multiprocessing.set_start_method('spawn', force=True)
     logger = setup_primary_logging(args.exp_path / 'train.log')
-    mp.spawn(main_work, args=(args.world_size, args, logger), nprocs=args.world_size, join=True)
+
+    if OS_SYSTEM == 'Linux':
+        torch.multiprocessing.set_start_method('spawn', force=True)
+        mp.spawn(main_work, args=(args.world_size, args, logger), nprocs=args.world_size, join=True)
+    elif OS_SYSTEM == 'Windows':
+        main_work(rank=0, world_size=1, args=args, logger=logger)
 
     #########################################################
 
