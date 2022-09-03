@@ -4,13 +4,12 @@
 
 This is repository for source code to train various object detection models. currently, It supports pretrained YOLOv3 weight(darknet32.pt, yolov3.pt) from [here](https://drive.google.com/drive/folders/15qXxbD7RG19uZBhG3NPWwfqt6OdksAPR?usp=sharing)
 
- - **COCO2017 Average Precision** (sanity check of training code - target model: YOLOv3)
+ - **Performance Benchmark**
 
-| Model | size<sup>(pixels) | mAP<sup>0.5:0.95 | mAP<sup>0.5 | Params(M) | FLOPS(B) |
-| :---: | :---: | :---: | :---: | :---: | :---: | 
-| YOLOv3(paper) | 320 x 320 | 28.7 | 51.8 | 61.95 | 39.15 |
-| YOLOv3(paper) | 416 x 416 | 31.2 | 55.4 | 61.95 | 66.17 |
-| YOLOv3(paper) | 512 x 512 | 32.7 | 57.7 | 61.95 | 100.24 |
+| Model | Dataset | size<sup>(pixels) | mAP<sup>0.5:0.95 | mAP<sup>0.5 | Params(M) | FLOPS(B) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
+| YOLOv3 | COCO2017 | 416 x 416 | 31.2 | 55.4 | 61.95 | 66.17 |
+| YOLOv3 | VOC2012 | 416 x 416 | - | 87.4 | 61.95 | 66.17 |
 
 
 
