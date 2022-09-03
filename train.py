@@ -369,7 +369,7 @@ def main():
     parser.add_argument('--sgd', action='store_true', help='use of SGD optimizer (default: Adam optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')
-    parser.add_argument('--warm_up', type=int, default=10, help='warm-up epoch for lr scheduler activation')
+    parser.add_argument('--warm_up', type=int, default=5, help='warm-up epoch for lr scheduler activation')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
