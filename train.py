@@ -159,7 +159,8 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
 
 def main_work(rank, world_size, args, logger):
     ################################### Init Params ###################################
-    setup_worker_logging(rank, logger)
+    if OS_SYSTEM == 'Linux':
+        setup_worker_logging(rank, logger)
     shutil.copy2(args.data_path, args.exp_path / args.data_path.name)
     shutil.copy2(args.config_path, args.exp_path / args.config_path.name)
 
@@ -392,12 +393,12 @@ def main():
 
     #########################################################
     # Set multiprocessing type to spawn
-    logger = setup_primary_logging(args.exp_path / 'train.log')
-
     if OS_SYSTEM == 'Linux':
         torch.multiprocessing.set_start_method('spawn', force=True)
+        logger = setup_primary_logging(args.exp_path / 'train.log')
         mp.spawn(main_work, args=(args.world_size, args, logger), nprocs=args.world_size, join=True)
     elif OS_SYSTEM == 'Windows':
+        logger = build_win_logger(args.exp_path / 'train.log')
         main_work(rank=0, world_size=1, args=args, logger=logger)
     #########################################################
 
