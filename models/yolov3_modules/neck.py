@@ -38,6 +38,9 @@ class YOLOv3_FPN(nn.Module):
         self.topdown3 = TopDownLayer(384, 256, last_dim_channels)
         self.upsample = nn.Upsample(scale_factor=2)
 
+        self.apply(self._weight_init_xavier_uniform)
+
+
     def forward(self, x1, x2, x3):
         out1 = self.topdown1(x1)
         tmp = self.upsample(self.conv1(self.topdown1.branch))
@@ -47,6 +50,14 @@ class YOLOv3_FPN(nn.Module):
         tmp = torch.cat((tmp, x3), dim=1)
         out3 = self.topdown3(tmp)
         return out1, out2, out3
+
+
+    def _weight_init_xavier_uniform(self, module):
+        if isinstance(module, torch.nn.Conv2d):
+            torch.nn.init.xavier_uniform_(module.weight)
+        elif isinstance(module, torch.nn.BatchNorm2d):
+            module.weight.data.fill_(1.0)
+
 
 
 if __name__ == "__main__":
