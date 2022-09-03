@@ -149,9 +149,7 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
-    if rank == 0:
-        canvas = visualize_prediction(canvas_img, detections[0][1], 0.1, class_list, color_list)
-
+    canvas = visualize_prediction(canvas_img, detections[0][1], 0.1, class_list, color_list) if rank == 0 else None
     del images, predictions, losses
     torch.cuda.empty_cache()
     return total_loss, gather_objects, canvas
@@ -306,7 +304,8 @@ def main_work(rank, world_size, args, logger):
         val_loss, gather_objects, canvas_val = execute_val(rank=rank, world_size=world_size, config=config_item,
                                                            dataloader=val_loader, model=model, criterion=criterion,
                                                            class_list=class_list, color_list=color_list)
-        scheduler.step()
+        if epoch > args.warm_up:
+            scheduler.step()
 
         if rank == 0:
             monitor_text = f' Train Loss: {train_loss/world_size:.2f}, Val Loss: {val_loss/world_size:.2f}'
@@ -370,6 +369,7 @@ def main():
     parser.add_argument('--sgd', action='store_true', help='use of SGD optimizer (default: Adam optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')
+    parser.add_argument('--warm_up', type=int, default=10, help='warm-up epoch for lr scheduler activation')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
