@@ -353,7 +353,7 @@ def main_work(rank, world_size, args, logger):
 
     if rank == 0:
         logging.warning(f' Best mAP@0.5: {best_mAP:.3f} at [Epoch:{best_epoch}/{num_epochs}]')
-        logging.warning(eval_text)
+        logging.warning(best_perf)
     cleanup()
 
 
