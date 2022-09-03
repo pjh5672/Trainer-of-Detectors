@@ -328,6 +328,8 @@ def main_work(rank, world_size, args, logger):
             if epoch >= args.start_save:
                 if mAP_info['all']['mAP_50'] > best_mAP:
                     best_mAP = mAP_info['all']['mAP_50']
+                    best_epoch = epoch
+                    best_perf = eval_text
                     model_to_save = deepcopy(model.module).cpu() if hasattr(model, 'module') else deepcopy(model).cpu()
                     model_to_save.class_list = class_list
                     save_item = {'epoch': epoch,
@@ -350,7 +352,8 @@ def main_work(rank, world_size, args, logger):
                         fig_PR_curves[class_id].clf()
 
     if rank == 0:
-        logging.warning(f' Best mAP@0.5: {best_mAP:.3f}')
+        logging.warning(f' Best mAP@0.5: {best_mAP:.3f} at [Epoch:{best_epoch}/{num_epochs}]')
+        logging.warning(eval_text)
     cleanup()
 
 
