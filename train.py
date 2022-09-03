@@ -283,9 +283,9 @@ def main_work(rank, world_size, args, logger):
             map_location = {'cpu':'cuda:%d' %rank}
             checkpoint = torch.load(config_item['PRETRAINED_PATH'], map_location=map_location)
             if hasattr(model, 'module'):
-                model.module.load_state_dict(checkpoint, strict=True)
+                model.module.load_state_dict(checkpoint, strict=False)
             else:
-                model.load_state_dict(checkpoint, strict=True)
+                model.load_state_dict(checkpoint, strict=False)
 
     #################################### Train Model ####################################
     best_mAP = args.init_score
@@ -399,7 +399,6 @@ def main():
         mp.spawn(main_work, args=(args.world_size, args, logger), nprocs=args.world_size, join=True)
     elif OS_SYSTEM == 'Windows':
         main_work(rank=0, world_size=1, args=args, logger=logger)
-
     #########################################################
 
 if __name__ == '__main__':
