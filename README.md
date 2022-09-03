@@ -9,7 +9,7 @@ This is repository for source code to train various object detection models. cur
 | Model | Dataset | size<sup>(pixels) | mAP<sup>0.5:0.95 | mAP<sup>0.5 | Params(M) | FLOPS(B) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
 | YOLOv3 | COCO2017 | 416 x 416 | 31.2 | 55.4 | 61.95 | 66.17 |
-| YOLOv3 | VOC2012 | 416 x 416 | - | 87.4 | 61.95 | 66.17 |
+ YOLOv3 | VOC2012 | 416 x 416 | - | 87.4 | 61.63 | 65.74 |
 
 
 
