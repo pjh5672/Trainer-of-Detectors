@@ -15,21 +15,28 @@ class YOLOv3_Model(nn.Module):
 
         self.input_size = item['INPUT_SIZE']
         self.anchors = [x for x in item['ANCHORS'].values()]
-        self.num_attribute = 5 + num_classes
+        self.num_classes = num_classes
+        self.num_attribute = 5 + self.num_classes
         self.num_anchor_per_scale = len(self.anchors[0])
         self.last_dim_channels = self.num_attribute * self.num_anchor_per_scale
         self.backbone = Darknet53_backbone()
-        self.fpn = YOLOv3_FPN(last_dim_channels=self.last_dim_channels)
-        self.head = YOLOv3_head(input_size=self.input_size, 
-                                num_classes=num_classes, 
-                                anchors=self.anchors,
-                                num_anchor_per_scale=self.num_anchor_per_scale)
+        self.fpn = YOLOv3_FPN()
+        self.head = YOLOv3_head(input_size=self.input_size, num_classes=num_classes, anchors=self.anchors)
+        self.apply(self._weight_init_kaiming_uniform)
+
 
     def forward(self, x):
         x1, x2, x3 = self.backbone(x)
         out_l, out_m, out_s = self.fpn(x1, x2, x3)
         predictions = self.head(out_l, out_m, out_s)
         return predictions
+
+
+    def _weight_init_kaiming_uniform(self, module):
+        if isinstance(module, nn.Conv2d):
+            nn.init.kaiming_uniform_(module.weight)
+        elif isinstance(module, nn.BatchNorm2d):
+            module.weight.data.fill_(1.0)
 
 
 

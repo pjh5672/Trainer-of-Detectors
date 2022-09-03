@@ -26,9 +26,8 @@ class YOLOv3_Loss():
         self.ignore_threshold = item['IGNORE_THRESH']
         self.coeff_coord = item['COEFFICIENT_COORD']
         self.coeff_noobj = item['COEFFICIENT_NOOBJ']
-
-        self.num_classes = model.head.num_classes
-        self.num_anchor_per_scale = model.head.num_anchor_per_scale
+        self.num_classes = model.num_classes
+        self.num_anchor_per_scale = model.num_anchor_per_scale
 
         dummy_x = torch.randn(1, 3, self.input_size, self.input_size)
         with torch.no_grad():
@@ -37,8 +36,8 @@ class YOLOv3_Loss():
         self.anchors = [model.head.anchor_L, model.head.anchor_M, model.head.anchor_S]
         self.strides = [model.head.head_L.stride, model.head.head_M.stride, model.head.head_S.stride]
         self.num_anchors = len(self.anchors)
-        self.mae_loss = nn.L1Loss(reduction='sum')
-        self.bce_loss = nn.BCEWithLogitsLoss(reduction='sum')
+        self.mae_loss = nn.L1Loss(reduction='mean')
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')
 
 
     def __call__(self, predictions, targets):
@@ -78,12 +77,7 @@ class YOLOv3_Loss():
             cls_loss += loss_cls
             total_loss += self.coeff_coord * (loss_tx + loss_ty + loss_tw + loss_th) + \
                           loss_obj + self.coeff_noobj * loss_noobj + loss_cls
-            
-        coord_loss /= self.batch_size
-        obj_loss /= self.batch_size
-        noobj_loss /= self.batch_size
-        cls_loss /= self.batch_size
-        total_loss /= self.batch_size
+
         return total_loss, coord_loss, obj_loss, noobj_loss, cls_loss
 
 
@@ -206,14 +200,14 @@ if __name__ == "__main__":
     batch_size = 2
     device = torch.device('cpu')
 
-    transformer = build_transformer(image_size=(416, 416))
-    train_dset = Dataset(data_path=data_path, phase='train', transformer=transformer['train'])
-    val_dset = Dataset(data_path=data_path, phase='val', transformer=transformer['val'])
+    transformers = build_transformer(input_size=(416, 416))
+    train_dset = Dataset(data_path=data_path, phase='train', rank=0, time_created='123', transformer=transformers['train'])
+    val_dset = Dataset(data_path=data_path, phase='val', rank=0, time_created='123', transformer=transformers['val'])
     dataloaders = {}
     dataloaders['train'] = DataLoader(train_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)
     dataloaders['val'] = DataLoader(val_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)         
     class_list = train_dset.classname_list
-    model = YOLOv3_Model(config_path=config_path, num_classes=len(class_list), pretrained=True)
+    model = YOLOv3_Model(config_path=config_path, num_classes=len(class_list))
     model = model.to(device)
     criterion = YOLOv3_Loss(config_path=config_path, model=model)
 

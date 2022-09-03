@@ -142,6 +142,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-04 | add: pretrained yolov3 weights excluding head update |
 | 09-03 | add: PASCAL-VOC2012 data update, More than 20 figures memory comsumption warning |
 | 08-27 | add:exception visualize condition in case of detection nothing |
 | 08-26 | add:logging function for model parameters & FLOPS |
