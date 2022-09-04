@@ -7,7 +7,7 @@
   1-1. [Data configuraion](#data-configuraion)  
   1-2. [Train configuraion](#train-configuraion)  
 2. [Usage](#usage)  
-  2-1. [Train detector model](#train-detector)  
+  2-1. [Train detector model](#train-detector-model)  
   2-2. [Analyse training result](#analyse-training-result)  
 3. [Update](#update)
 4. [Contact](#contact)
