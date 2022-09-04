@@ -26,7 +26,7 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | COCO2017 | 416 x 416 | 31.2 | 55.4 | 61.95 | 65.86 |
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | COCO2017 | 416 x 416 | 26.0 | 44.3 | 61.95 | 66.17 |
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | VOC2012 | 416 x 416 | - | 87.4 | 61.63 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | VOC2012 | 416 x 416 | - | - | 61.63 | 65.74 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | VOC2012 | 416 x 416 | 31.6 | 50.9 | 61.63 | 65.74 |
 
 
 #### Data configuraion
