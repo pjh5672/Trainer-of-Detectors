@@ -62,7 +62,7 @@ class Evaluator():
             else:
                 eval_text += self.summarize(mAP_info[areaLbl]['mAP_50'], iouThr=0.50, areaLbl=areaLbl, maxDets=self.maxDets)
                 eval_text += '\n'
-        return mAP_info, eval_text
+        return mAP_info, eval_text.rstrip('\n')
 
 
     def summarize(self, mAP, iouThr=None, areaLbl='all', maxDets=100):
