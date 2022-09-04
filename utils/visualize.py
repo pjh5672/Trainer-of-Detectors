@@ -1,5 +1,6 @@
 import random
 import cv2
+import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -8,7 +9,7 @@ from collections import defaultdict
 
 from general import box_transform_xcycwh_to_x1y1x2y2, scale_to_original
 
-
+matplotlib.use('Agg')
 TEXT_COLOR = (255, 255, 255)
 
 
