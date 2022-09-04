@@ -48,7 +48,7 @@ This is repository for source code to train various object detection models. cur
     - **exp_name** : name to log training
     - **world_size** : number of available GPU devices
     - **img_interval** : image logging interval
-    - **start_save** : starting model saving epoch
+    - **warm_up** : warm-up epoch for mAP evaluation
     - **init_score** : initial mAP score for update best model
     - **sgd** : use of SGD optimizer (default: Adam optimizer)
     - **linear_lr** : use of linear LR scheduler (default: one cyclic scheduler)

@@ -90,14 +90,17 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
 
-    canvas = visualize_target(canvas_img, canvas_gt, class_list, color_list) if rank == 0 else None
+    if (epoch > args.warm_up) and (rank == 0):
+        canvas = visualize_target(canvas_img, canvas_gt, class_list, color_list)
+    else:
+        canvas = None
     del images, predictions, losses
     torch.cuda.empty_cache()
     return total_loss, canvas
 
 
 @torch.no_grad()
-def execute_val(rank, world_size, config, dataloader, model, criterion, class_list, color_list):
+def execute_val(rank, world_size, args, config, dataloader, model, criterion, class_list, color_list):
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
     total_loss = 0.0
     count_non_inf = 0
@@ -120,15 +123,16 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
         predictions[..., 4:] = torch.sigmoid(predictions[..., 4:])
         predictions[..., 5:] *= predictions[..., 4:5]
 
-        for idx in range(len(filenames)):
-            filename = filenames[idx]
-            max_side = max_sides[idx]
-            pred_yolo = predictions[idx].cpu().numpy()
-            pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
-            pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
-            pred_yolo = run_NMS_for_YOLO(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'])
-            if len(pred_yolo) > 0:
-                detections.append((filename, pred_yolo, max_side))
+        if epoch > args.warm_up:
+            for idx in range(len(filenames)):
+                filename = filenames[idx]
+                max_side = max_sides[idx]
+                pred_yolo = predictions[idx].cpu().numpy()
+                pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
+                pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
+                pred_yolo = run_NMS_for_YOLO(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'])
+                if len(pred_yolo) > 0:
+                    detections.append((filename, pred_yolo, max_side))
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
@@ -149,7 +153,10 @@ def execute_val(rank, world_size, config, dataloader, model, criterion, class_li
     elif OS_SYSTEM == 'Windows':
         gather_objects = [detections]
 
-    canvas = visualize_prediction(canvas_img, detections[0][1], 0.1, class_list, color_list) if rank == 0 else None
+    if (epoch > args.warm_up) and (rank == 0):
+        canvas = visualize_prediction(canvas_img, detections[0][1], 0.1, class_list, color_list)
+    else:
+        canvas = None
     del images, predictions, losses
     torch.cuda.empty_cache()
     return total_loss, gather_objects, canvas
@@ -287,10 +294,14 @@ def main_work(rank, world_size, args, logger):
                 model.load_state_dict(checkpoint, strict=False)
 
     #################################### Train Model ####################################
+    global epoch
+    epoch = 0
     best_mAP = args.init_score
+    best_perf = None
     progress_bar = tqdm(range(start_epoch, num_epochs+1), ncols=110) if rank == 0 else range(start_epoch, num_epochs+1)
 
-    for epoch in progress_bar:
+    for _ in progress_bar:
+        epoch += 1
         if rank == 0:
             message = f'[Epoch:{epoch:03d}/{len(progress_bar):03d}]'
             progress_bar.set_description(desc=message)
@@ -301,7 +312,7 @@ def main_work(rank, world_size, args, logger):
         train_loss, canvas_train = execute_train(rank=rank, args=args, dataloader=train_loader, model=model,
                                                  criterion=criterion, optimizer=optimizer, scaler=scaler,
                                                  class_list=class_list, color_list=color_list)
-        val_loss, gather_objects, canvas_val = execute_val(rank=rank, world_size=world_size, config=config_item,
+        val_loss, gather_objects, canvas_val = execute_val(rank=rank, args=args, world_size=world_size, config=config_item,
                                                            dataloader=val_loader, model=model, criterion=criterion,
                                                            class_list=class_list, color_list=color_list)
         scheduler.step()
@@ -310,21 +321,21 @@ def main_work(rank, world_size, args, logger):
             monitor_text = f' Train Loss: {train_loss/world_size:.2f}, Val Loss: {val_loss/world_size:.2f}'
             logging.warning(message + monitor_text)
 
-            start = time.time()
-            detections = []
-            for det in gather_objects:
-                detections.extend(det)
-            mAP_info, eval_text = evaluator(detections)
-            logging.warning(message + f' mAP Computation Time(sec): {time.time() - start:.4f}')
-            logging.warning(eval_text)
-
             if epoch % args.img_interval == 0:
                 if canvas_train is not None:
                     imwrite(str(args.image_log_dir / 'train' / f'EP{epoch:03d}.jpg'), canvas_train)
                 if canvas_val is not None:
                     imwrite(str(args.image_log_dir / 'val' / f'EP{epoch:03d}.jpg'), canvas_val)
 
-            if epoch >= args.start_save:
+            if epoch > args.warm_up:
+                start = time.time()
+                detections = []
+                for det in gather_objects:
+                    detections.extend(det)
+                mAP_info, eval_text = evaluator(detections)
+                logging.warning(message + f' mAP Computation Time(sec): {time.time() - start:.4f}')
+                logging.warning(eval_text)
+
                 if mAP_info['all']['mAP_50'] > best_mAP:
                     best_mAP = mAP_info['all']['mAP_50']
                     best_epoch = epoch
@@ -332,10 +343,10 @@ def main_work(rank, world_size, args, logger):
                     model_to_save = deepcopy(model.module).cpu() if hasattr(model, 'module') else deepcopy(model).cpu()
                     model_to_save.class_list = class_list
                     save_item = {'epoch': epoch,
-                                 'class_list': class_list,
-                                 'model_state_dict': model_to_save.state_dict(),
-                                 'optimizer_state_dict': optimizer.state_dict(),
-                                 'scaler_state_dict': scaler.state_dict()}
+                                'class_list': class_list,
+                                'model_state_dict': model_to_save.state_dict(),
+                                'optimizer_state_dict': optimizer.state_dict(),
+                                'scaler_state_dict': scaler.state_dict()}
                     save_model(model=save_item, save_path=args.weight_dir / f'model_EP{epoch:03d}.pt')
 
                     analysis_result = analyse_mAP_info(mAP_info['all'], class_list)
@@ -350,7 +361,7 @@ def main_work(rank, world_size, args, logger):
                         fig_PR_curves[class_id].savefig(str(PR_curve_dir / f'{class_list[class_id]}.png'))
                         fig_PR_curves[class_id].clf()
 
-    if rank == 0:
+    if (rank == 0) and (best_perf is not None):
         logging.warning(f' Best mAP@0.5: {best_mAP:.3f} at [Epoch:{best_epoch}/{num_epochs}]')
         logging.warning(best_perf)
     cleanup()
@@ -358,16 +369,16 @@ def main_work(rank, world_size, args, logger):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='Path to data.yaml file')
-    parser.add_argument('--config_path', type=str, default='config/yolov3.yaml', help='Path to config.yaml file')
-    parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='Name to log training')
-    parser.add_argument('--world_size', type=int, default=1, help='Number of available GPU devices')
-    parser.add_argument('--img_interval', type=int, default=10, help='Image logging interval')
-    parser.add_argument('--start_save', type=int, default=30, help='Starting model saving epoch')
-    parser.add_argument('--init_score', type=float, default=0.1, help='Initial mAP score for update best model')
+    parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='path to data.yaml file')
+    parser.add_argument('--config_path', type=str, default='config/yolov3.yaml', help='path to config.yaml file')
+    parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='name to log training')
+    parser.add_argument('--world_size', type=int, default=1, help='number of available GPU devices')
+    parser.add_argument('--img_interval', type=int, default=10, help='image logging interval')
+    parser.add_argument('--init_score', type=float, default=0.1, help='initial mAP score for update best model')
     parser.add_argument('--sgd', action='store_true', help='use of SGD optimizer (default: Adam optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')
+    parser.add_argument('--warm_up', type=int, default=10, help='warm-up epoch for mAP evaluation')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path
