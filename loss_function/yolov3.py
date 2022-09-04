@@ -36,8 +36,8 @@ class YOLOv3_Loss():
         self.anchors = [model.head.anchor_L, model.head.anchor_M, model.head.anchor_S]
         self.strides = [model.head.head_L.stride, model.head.head_M.stride, model.head.head_S.stride]
         self.num_anchors = len(self.anchors)
-        self.mae_loss = nn.L1Loss(reduction='mean')
-        self.bce_loss = nn.BCEWithLogitsLoss(reduction='mean')
+        self.mae_loss = nn.L1Loss(reduction='sum')
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='sum')
 
 
     def __call__(self, predictions, targets):
@@ -78,6 +78,11 @@ class YOLOv3_Loss():
             total_loss += self.coeff_coord * (loss_tx + loss_ty + loss_tw + loss_th) + \
                           loss_obj + self.coeff_noobj * loss_noobj + loss_cls
 
+        coord_loss /= self.batch_size
+        obj_loss /= self.batch_size
+        noobj_loss /= self.batch_size
+        cls_loss /= self.batch_size
+        total_loss /= self.batch_size
         return total_loss, coord_loss, obj_loss, noobj_loss, cls_loss
 
 
@@ -173,7 +178,6 @@ class YOLOv3_Loss():
         b_target_th = torch.stack(b_target_th, dim=0)
         b_target_cls = torch.stack(b_target_cls, dim=0)
         return b_obj_mask, b_noobj_mask, b_target_tx, b_target_ty, b_target_tw, b_target_th, b_target_cls
-
 
 
 
