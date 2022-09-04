@@ -2,12 +2,12 @@
 
 ## Description
 
-This is repository for source code to train various object detection models. currently, It supports pretrained YOLOv3 weight(darknet53.pt, yolov3.pt) from [here](https://drive.google.com/drive/folders/15qXxbD7RG19uZBhG3NPWwfqt6OdksAPR?usp=sharing)
+This is repository for source code to train various object detection models. currently, It supports pretrained YOLOv3 weight(**darknet53.pt, yolov3.pt**) from [here](https://drive.google.com/drive/folders/15qXxbD7RG19uZBhG3NPWwfqt6OdksAPR?usp=sharing)
 
 
- - <span style="background-color:#DCFFE4">Performance Benchmark</span>
+ - **<span style="background-color:#DCFFE4">Performance Benchmark</span>**
 
-| Model | Dataset | size<sup>(pixels) | mAP<sup>0.5:0.95 | mAP<sup>0.5 | Params(M) | FLOPS(B) |
+| Model | Dataset | size<sup>(pixel) | mAP<sup>0.5:0.95 | mAP<sup>0.5 | Params(M) | FLOPS(B) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | COCO2017 | 416 x 416 | 31.2 | 55.4 | 61.95 | 65.86 |
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | COCO2017 | 416 x 416 | 26.0 | 44.3 | 61.95 | 66.17 |
@@ -15,8 +15,8 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | VOC2012 | 416 x 416 | - | - | 61.63 | 65.74 |
 
 
+##
 
-## Description
 
 #### 1. Data Config
 
@@ -39,6 +39,9 @@ This is repository for source code to train various object detection models. cur
     - **INPUT_CHANNEL** : size of input channel to be used for model calculation
     - **BATCH_SIZE** : size of the mini-batch to be calculated during one iteration of training  
     (...see *.yaml.example file for more details)
+
+
+##
 
 
 ## Usage
