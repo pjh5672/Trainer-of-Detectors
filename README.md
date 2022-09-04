@@ -1,5 +1,19 @@
 # <div align="center">Object Detector Trainer</div>
 
+---
+
+### Contents
+1. [Description](#description)
+  1-1. [Data configuraion](#data-configuraion)
+  1-2. [Train configuraion](#train-configuraion)
+2. [Usage](#usage)
+  2-1. [Train detector model](#train-detector)
+  2-2. [Analyse training result](#analyse-training-result)
+3. [Update](#update)
+4. [Contact](#contact)
+
+---
+
 ## Description
 
 This is repository for source code to train various object detection models. currently, It supports pretrained YOLOv3 weight(**darknet53.pt, yolov3.pt**) from [here](https://drive.google.com/drive/folders/15qXxbD7RG19uZBhG3NPWwfqt6OdksAPR?usp=sharing)
@@ -15,10 +29,7 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | VOC2012 | 416 x 416 | - | - | 61.63 | 65.74 |
 
 
-##
-
-
-#### 1. Data Config
+#### Data configuraion
 
  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
  - **`*.yaml` Arguments**
@@ -28,7 +39,7 @@ This is repository for source code to train various object detection models. cur
     - **mAP_FILE** : path of verification data file to be loaded for mAP metric calculation (automatically created when verification data is first loaded)
     - **NAMES** : list of category names the model will learn from
 
-#### 2. Train Config
+#### Train configuraion
 
  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
  - **`*.yaml` Arguments**
@@ -41,12 +52,10 @@ This is repository for source code to train various object detection models. cur
     (...see *.yaml.example file for more details)
 
 
-##
-
 
 ## Usage
 
-#### 1. Train Detector
+#### Train detector model
 
  - **Train Arguments**
     - **data_path** : path to data.yaml file
@@ -66,7 +75,7 @@ train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name tr
 ```
 
 
-#### 2. Result Analysis
+#### Analyse training result
 
  - **Log file**
 ```log
@@ -144,7 +153,7 @@ $ pip install -r requirements.txt
 ## Update
 
 <details>
-    <summary><b> Timeline in 2022 </b></summary>
+    <summary> Timeline in 2022 </summary>
 
 | Date | Content |
 |:----:|:-----|
