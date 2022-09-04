@@ -44,7 +44,7 @@ class Dataset():
             self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase, rank=rank)
 
         if rank == 0:
-            data_path = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=110)
+            data_path = tqdm(zip(self.image_paths, self.label_paths), total=len(self.image_paths), ncols=115)
         else:
             data_path = zip(self.image_paths, self.label_paths)
 
@@ -129,7 +129,7 @@ class Dataset():
             eval_data['categories'] = {}
             eval_data['timestamp'] = datetime.today().strftime('%Y-%m-%d_%H:%M')
             
-            pbar = tqdm(range(len(self.label_paths)), ncols=110) if rank == 0 else range(len(self.label_paths))
+            pbar = tqdm(range(len(self.label_paths)), ncols=115) if rank == 0 else range(len(self.label_paths))
             img_id = 0
             anno_id = 0
             for index in pbar:

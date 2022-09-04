@@ -81,7 +81,7 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
                     total_loss += loss_value
                     count_non_inf += 1
             else:
-                monitor_text += f'{loss_name}: {loss_value.item():.2f} '
+                monitor_text += f'{loss_name}: {loss_value.item():.3f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
 
@@ -141,7 +141,7 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
                     total_loss += loss_value
                     count_non_inf += 1
             else:
-                monitor_text += f'{loss_name}: {loss_value.item():.2f} '
+                monitor_text += f'{loss_name}: {loss_value.item():.3f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
 
@@ -240,7 +240,7 @@ def main_work(rank, world_size, args, logger):
 
     ################################### Calculate BPR ####################################
     if config_item['GET_PBR']:
-        dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=110, leave=False) if rank == 0 else train_loader
+        dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=115, leave=False) if rank == 0 else train_loader
         num_anchor_per_scale = criterion.num_anchor_per_scale
         anchors = criterion.anchors
         strides = criterion.strides
@@ -298,15 +298,15 @@ def main_work(rank, world_size, args, logger):
     epoch = 0
     best_mAP = args.init_score
     best_perf = None
-    progress_bar = tqdm(range(start_epoch, num_epochs+1), ncols=110) if rank == 0 else range(start_epoch, num_epochs+1)
+    progress_bar = tqdm(range(start_epoch, num_epochs+1), ncols=115) if rank == 0 else range(start_epoch, num_epochs+1)
 
     for _ in progress_bar:
         epoch += 1
         if rank == 0:
             message = f'[Epoch:{epoch:03d}/{len(progress_bar):03d}]'
             progress_bar.set_description(desc=message)
-            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=110, leave=False)
-            val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=110, leave=False)
+            train_loader = tqdm(train_loader, desc='[Phase:TRAIN]', ncols=115, leave=False)
+            val_loader = tqdm(val_loader, desc='[Phase:VAL]', ncols=115, leave=False)
 
         train_sampler.set_epoch(epoch)
         train_loss, canvas_train = execute_train(rank=rank, args=args, dataloader=train_loader, model=model,
