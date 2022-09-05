@@ -20,10 +20,10 @@ class Transformer():
         self.h_gain=0.015
         self.s_gain=0.7
         self.v_gain=0.4
-        self.degrees=10
+        self.degrees=15
         self.translate=0.15
-        self.scale=0.8
-        self.perspective=0.0005
+        self.scale=0.9
+        self.perspective=0.0001
         self.augmentor = self.build_albumentation() if self.phase == 'train' else None
 
 

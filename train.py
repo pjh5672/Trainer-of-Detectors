@@ -56,6 +56,7 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
     total_loss = 0.0
     count_non_inf = 0
+    accumulate = 0
     model.train()
     optimizer.zero_grad()
 
