@@ -13,16 +13,6 @@ matplotlib.use('Agg')
 TEXT_COLOR = (255, 255, 255)
 
 
-def denormalize(input_tensor, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
-    tensor = input_tensor.clone()
-    for t, m, s in zip(tensor, mean, std):
-        t.mul_(s).add_(m)
-    tensor.clamp_(min=0, max=1.)
-    tensor *= 255.
-    image = tensor.permute(1,2,0).numpy().astype(np.uint8)
-    return image
-
-
 def generate_random_color(num_colors):
     color_list = []
     for i in range(num_colors):
@@ -34,7 +24,7 @@ def generate_random_color(num_colors):
 
 def visualize_bbox(image, label, class_list, color_list, show_class=False, show_score=False, fontscale=0.7, thickness=2):
     class_id = int(label[0])
-    if class_id > 0:
+    if class_id >= 0:
         color = color_list[class_id]
         x_min, y_min, x_max, y_max = list(map(int, label[1:5]))
         cv2.rectangle(image, (x_min, y_min), (x_max, y_max), color=color, thickness=thickness)
@@ -58,9 +48,8 @@ def visualize(image, label, class_list, color_list, show_class=False, show_score
     return canvas
 
 
-def visualize_prediction(tensor_image, detection, conf_threshold, class_list, color_list):
-    input_size = tensor_image.shape[-1]
-    canvas = denormalize(tensor_image)
+def visualize_prediction(canvas, detection, conf_threshold, class_list, color_list):
+    input_size = canvas.shape[0]
     pred_voc = detection[detection[:, 5] >= conf_threshold].copy()
     if len(pred_voc) > 0:
         pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
@@ -69,9 +58,8 @@ def visualize_prediction(tensor_image, detection, conf_threshold, class_list, co
     return canvas[...,::-1]
 
 
-def visualize_target(tensor_image, target, class_list, color_list):
-    input_size = tensor_image.shape[-1]
-    canvas = denormalize(tensor_image)
+def visualize_target(canvas, target, class_list, color_list):
+    input_size = canvas.shape[0]
     target_voc = target.copy()
     target_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(target_voc[:, 1:5])
     target_voc[:, 1:5] = scale_to_original(target_voc[:, 1:5], scale_w=input_size, scale_h=input_size)

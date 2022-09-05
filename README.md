@@ -63,7 +63,7 @@ This is repository for source code to train various object detection models. cur
     - **exp_name** : name to log training
     - **world_size** : number of available GPU devices
     - **img_interval** : image logging interval
-    - **warm_up** : warm-up epoch for mAP evaluation
+    - **start_eval** : starting epoch for mAP evaluation
     - **init_score** : initial mAP score for update best model
     - **sgd** : use of SGD optimizer (default: Adam optimizer)
     - **linear_lr** : use of linear LR scheduler (default: one cyclic scheduler)
@@ -157,6 +157,8 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-06 | fix:make model training stable with adjust lr in early training |
+| 09-05 | add:data augmentation(albumentation, fliplr, random perspective transform) |
 | 09-04 | add:pretrained yolov3 weights excluding head update, fix:mae & bce loss nan due to large batch size |
 | 09-03 | add:PASCAL-VOC2012 data update, More than 20 figures memory comsumption warning |
 | 08-27 | add:exception visualize condition in case of detection nothing |

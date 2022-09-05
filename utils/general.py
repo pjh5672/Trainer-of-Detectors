@@ -15,6 +15,12 @@ def scale_to_original(bboxes, scale_w, scale_h):
     return bboxes.round(2)
 
 
+def scale_to_norm(bboxes, image_w, image_h):
+    bboxes[:,[0,2]] /= image_w
+    bboxes[:,[1,3]] /= image_h
+    return bboxes
+
+
 def clip_box_coordinates(bboxes):
     bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
     bboxes = box_transform_x1y1x2y2_to_xcycwh(bboxes)

@@ -181,6 +181,7 @@ class YOLOv3_Loss():
 
 
 
+
 if __name__ == "__main__":
     import sys
     from pathlib import Path
@@ -191,7 +192,7 @@ if __name__ == "__main__":
     if str(ROOT) not in sys.path:
         sys.path.append(str(ROOT))
 
-    from dataloader import Dataset, build_transformer
+    from dataloader import Dataset, Transformer
     from models import YOLOv3_Model
 
     data_path = ROOT / 'data' / 'coco128.yaml'
@@ -203,14 +204,16 @@ if __name__ == "__main__":
     input_size = item['INPUT_SIZE']
     batch_size = 2
     device = torch.device('cpu')
-
-    transformers = build_transformer(input_size=(416, 416))
-    train_dset = Dataset(data_path=data_path, phase='train', rank=0, time_created='123', transformer=transformers['train'])
-    val_dset = Dataset(data_path=data_path, phase='val', rank=0, time_created='123', transformer=transformers['val'])
+    data_path = ROOT / 'data' / 'coco128.yaml'
+    train_transformer = Transformer(phase='train', input_size=416)
+    train_dataset = Dataset(data_path, phase='train', rank=0, time_created=0, transformer=train_transformer)
+    val_transformer = Transformer(phase='val', input_size=416)
+    val_dataset = Dataset(data_path, phase='val', rank=0, time_created=0, transformer=val_transformer)
     dataloaders = {}
-    dataloaders['train'] = DataLoader(train_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)
-    dataloaders['val'] = DataLoader(val_dset, batch_size=batch_size, collate_fn=Dataset.collate_fn, pin_memory=True)         
-    class_list = train_dset.classname_list
+    dataloaders['train'] = DataLoader(train_dataset, batch_size=8, collate_fn=Dataset.collate_fn, pin_memory=True)
+    dataloaders['val'] = DataLoader(val_dataset, batch_size=8, collate_fn=Dataset.collate_fn, pin_memory=True)         
+
+    class_list = train_dataset.classname_list
     model = YOLOv3_Model(config_path=config_path, num_classes=len(class_list))
     model = model.to(device)
     criterion = YOLOv3_Loss(config_path=config_path, model=model)

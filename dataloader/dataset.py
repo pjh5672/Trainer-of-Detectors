@@ -15,7 +15,7 @@ ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from transform import build_transformer, transform_square_image
+from transform import Transformer
 from utils import *
 
 
@@ -48,8 +48,7 @@ class Dataset():
         else:
             data_path = zip(self.image_paths, self.label_paths)
 
-        cache, self.data_info = make_cache_file(cache_dir=cache_dir, file_name=save_name, phase=phase, 
-                                                data_path=data_path, time_created=time_created)
+        cache, self.data_info = make_cache_file(cache_dir=cache_dir, file_name=save_name, phase=phase, data_path=data_path, time_created=time_created)
         assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files"
         self.transformer = transformer
 
@@ -61,21 +60,11 @@ class Dataset():
         max_side, pad_h, pad_w = 0, 0, 0
         filename, image = self.get_image(index)
         class_ids, bboxes = self.get_label(index)
-
-        if self.transformer:
-            image, bboxes, max_side = transform_square_image(image, bboxes)
-            bboxes = clip_box_coordinates(bboxes)
-            transformed_data = self.transformer(image=image, bboxes=bboxes, class_ids=class_ids)
-            
-            image = transformed_data['image']
-            bboxes = np.array(transformed_data['bboxes'], dtype=np.float32)
-            class_ids = np.array(transformed_data['class_ids'], dtype=np.float32)
-
-            if len(class_ids) == 0:
-                class_ids = np.array([-1])
-                bboxes = np.array([[0.5, 0.5, 1., 1.]], dtype=np.float32)
-            
+        bboxes = clip_box_coordinates(bboxes)
         target = np.concatenate((class_ids[:, np.newaxis], bboxes), axis=1)
+        
+        if self.transformer:
+            image, target, max_side = self.transformer(image=image, target=target)
         return image, target, filename, max_side
     
 
@@ -138,7 +127,6 @@ class Dataset():
 
                 filename, image = self.get_image(index)
                 class_ids, bboxes = self.get_label(index)
-                    
                 bboxes = clip_box_coordinates(bboxes)
                 bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
 
@@ -184,7 +172,6 @@ class Dataset():
             targets.append(target)
             filenames.append(filename)
             max_sides.append(max_side)
-        
         return torch.stack(images, dim=0), targets, filenames, max_sides
 
 
@@ -196,12 +183,13 @@ if __name__ == '__main__':
     ROOT = FILE.parents[1]
 
     data_path = ROOT / 'data' / 'coco128.yaml'
-    transformers = build_transformer(input_size=(416, 416))
-    train_dset = Dataset(data_path=data_path, phase='train', rank=0, time_created='123', transformer=transformers['train'])
-    val_dset = Dataset(data_path=data_path, phase='val', rank=0, time_created='123', transformer=transformers['val'])
+    train_transformer = Transformer(phase='train', input_size=416)
+    train_dataset = Dataset(data_path, phase='train', rank=0, time_created=0, transformer=train_transformer)
+    val_transformer = Transformer(phase='val', input_size=416)
+    val_dataset = Dataset(data_path, phase='val', rank=0, time_created=0, transformer=val_transformer)
     dataloaders = {}
-    dataloaders['train'] = DataLoader(train_dset, batch_size=1, collate_fn=Dataset.collate_fn, pin_memory=True)
-    dataloaders['val'] = DataLoader(val_dset, batch_size=1, collate_fn=Dataset.collate_fn, pin_memory=True)         
+    dataloaders['train'] = DataLoader(train_dataset, batch_size=1, collate_fn=Dataset.collate_fn, pin_memory=True)
+    dataloaders['val'] = DataLoader(val_dataset, batch_size=1, collate_fn=Dataset.collate_fn, pin_memory=True)         
 
     # sanity check
     for _ in range(1):
