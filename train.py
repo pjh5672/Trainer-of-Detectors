@@ -84,7 +84,7 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
         scaler.scale(losses[0]).backward()
         if ni - args.last_opt_step >= accumulate:
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
