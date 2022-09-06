@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import math
 import shutil
@@ -17,7 +18,7 @@ from torch.cuda import amp
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.backends import cudnn
-from torch.optim import SGD, Adam, lr_scheduler
+from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, distributed
 from torch.nn.parallel import DistributedDataParallel as DDP
 from thop import profile
@@ -53,55 +54,56 @@ def cleanup():
 
 
 def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, class_list, color_list):
+    global accumulate, last_opt_step
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
     total_loss = 0.0
-    count_non_inf = 0
-    accumulate = 0
     model.train()
     optimizer.zero_grad()
 
     for index, mini_batch in enumerate(dataloader):
+        ni = index + len(dataloader) * (epoch-1)
+
         if index == 0:
             canvas_img = to_image(denormalize(mini_batch[0][0]))
             canvas_gt = mini_batch[1][0]
 
-        images = mini_batch[0].cuda(rank, non_blocking=True)
-        targets = mini_batch[1]
+        images, targets = mini_batch[0].cuda(rank, non_blocking=True), mini_batch[1]
 
-        ni = index + args.nb * (epoch-1)
-        if ni <= args.nw:
-            xi = [0, args.nw]
-            accumulate = max(1, np.interp(ni, xi, [1, args.nbs / args.batch_size]).round())
+        if ni <= nw:
+            xi = [0, nw]
+            accumulate = max(1, np.interp(ni, xi, [1, nbs / batch_size]).round())
             for j, x in enumerate(optimizer.param_groups):
-                x['lr'] = np.interp(ni, xi, [args.warmup_bias_lr if j == 0 else 0.0, x['initial_lr'] * args.lf(epoch)])
+                x['lr'] = np.interp(ni, xi, [warmup_bias_lr if j == 0 else 0.0, x['initial_lr'] * lf(epoch)])
                 if 'momentum' in x:
-                    x['momentum'] = np.interp(ni, xi, [args.warmup_momentum, args.momentum])
+                    x['momentum'] = np.interp(ni, xi, [warmup_momentum, momentum])
 
         with amp.autocast(enabled=not args.no_amp):
             predictions = model(images)
             losses = criterion(predictions, targets)
+        if rank == 0:
+            logging.warning(f'nw: {nw}, ni: {ni}, last_opt_step: {last_opt_step}, accumulate: {accumulate}')
 
         scaler.scale(losses[0]).backward()
-        if ni - args.last_opt_step >= accumulate:
+        if ni - last_opt_step >= accumulate:
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
-            args.last_opt_step = ni
+            last_opt_step = ni
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
+            if not torch.isfinite(loss_value) and loss_name != 'total':
+                print(f'@@@@@@@@@@@@@@@@ {loss_name} - {loss_value} @@@@@@@@@@@@@@@@')
+                sys.exit(0)
             if loss_name == 'total':
-                if not torch.isinf(loss_value):
-                    total_loss += loss_value
-                    count_non_inf += 1
+                total_loss += loss_value
             else:
                 monitor_text += f'{loss_name}: {loss_value.item():.3f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
-
-    total_loss /= count_non_inf
+    total_loss /= len(dataloader)
 
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
@@ -119,7 +121,6 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
 def execute_val(rank, world_size, args, config, dataloader, model, criterion, class_list, color_list):
     loss_types = ['total', 'coord', 'obj', 'noobj', 'cls']
     total_loss = 0.0
-    count_non_inf = 0
     gather_objects = [None, ] * world_size
     detections = []
     model.eval()
@@ -128,10 +129,7 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
         if index == 0:
             canvas_img = to_image(denormalize(mini_batch[0][0]))
 
-        images = mini_batch[0].cuda(rank, non_blocking=True)
-        targets = mini_batch[1]
-        filenames = mini_batch[2]
-        max_sides = mini_batch[3]
+        images, targets, filenames, max_sides = mini_batch[0].cuda(rank, non_blocking=True), mini_batch[1], mini_batch[2], mini_batch[3]
 
         predictions = model(images)
         losses = criterion(predictions, targets)
@@ -152,16 +150,16 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
+            if not torch.isfinite(loss_value) and loss_name != 'total':
+                print(f'@@@@@@@@@@@@@@@@ {loss_name} - {loss_value} @@@@@@@@@@@@@@@@')
+                sys.exit(0)
             if loss_name == 'total':
-                if not torch.isinf(loss_value):
-                    total_loss += loss_value
-                    count_non_inf += 1
+                total_loss += loss_value
             else:
                 monitor_text += f'{loss_name}: {loss_value.item():.3f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
-
-    total_loss /= count_non_inf
+    total_loss /= len(dataloader)
 
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
@@ -180,6 +178,8 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
 
 def main_work(rank, world_size, args, logger):
     ################################### Init Params ###################################
+    global epoch, nbs, nw, lf, momentum, accumulate, batch_size, warmup_bias_lr, warmup_momentum, last_opt_step
+
     if OS_SYSTEM == 'Linux':
         setup_worker_logging(rank, logger)
     shutil.copy2(args.data_path, args.exp_path / args.data_path.name)
@@ -211,41 +211,27 @@ def main_work(rank, world_size, args, logger):
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
 
-    if rank == 0:
-        logging.warning(f'{train_set.data_info}')
-        logging.warning(f'{val_set.data_info}')
-        macs, params = profile(deepcopy(model), inputs=(torch.randn(1, input_channel, input_size, input_size),), verbose=False)
-        logging.warning(f'Params(M): {params/1e+6:.2f}, FLOPS(B): {2*macs/1E+9:.2f}')
-
-    g = [], [], []
-    for v in model.modules():
-        if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):
-            g[2].append(v.bias)
-        if isinstance(v, nn.BatchNorm2d):
-            g[1].append(v.weight)
-        elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):
-            g[0].append(v.weight)
-
-    if args.sgd:
-        optimizer = SGD(params=g[2], lr=lr0, momentum=momentum, nesterov=True)
-    else:
-        optimizer = Adam(params=g[2], lr=lr0, betas=(momentum, 0.999))
-
     nbs = 64 # nominal batch size
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
     weight_decay *= batch_size * accumulate / nbs  # scale weight_decay
-    optimizer.add_param_group({'params': g[0], 'weight_decay': weight_decay})  # add g0 with weight_decay
-    optimizer.add_param_group({'params': g[1], 'weight_decay': 0.0})  # add g1 (BatchNorm2d weights)
+    optimizer = build_optimizer(args=args, model=model, lr=lr0, momentum=momentum, weight_decay=weight_decay)
 
     val_file = args.data_path.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, config=config_item)
+
     if args.linear_lr:
         lf = lambda x: (1 - x / num_epochs) * (1.0 - lrf) + lrf
     else:
         lf = lambda x: ((1 - math.cos(x * math.pi / num_epochs)) / 2) * (lrf - 1) + 1
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scaler = amp.GradScaler(enabled=not args.no_amp)
+
+    if rank == 0:
+        logging.warning(f'{train_set.data_info}')
+        logging.warning(f'{val_set.data_info}')
+        macs, params = profile(deepcopy(model), inputs=(torch.randn(1, input_channel, input_size, input_size),), verbose=False)
+        logging.warning(f'Params(M): {params/1e+6:.2f}, FLOPS(B): {2*macs/1E+9:.2f}')
 
     ################################### Init Process ###################################
     setup(rank, world_size)
@@ -259,17 +245,6 @@ def main_work(rank, world_size, args, logger):
                               num_workers=num_workers, pin_memory=True, sampler=train_sampler)
     val_loader = DataLoader(dataset=val_set, collate_fn=Dataset.collate_fn, batch_size=batch_size, shuffle=False,
                             num_workers=num_workers, pin_memory=True, sampler=val_sampler)
-
-    ################################ Training Stability ################################
-    args.lf = lf
-    args.nbs = nbs
-    args.nb = len(train_loader)
-    args.nw = max(round(warmup_epoch * args.nb), 100)
-    args.momentum = momentum
-    args.batch_size = batch_size
-    args.warmup_bias_lr = warmup_bias_lr
-    args.warmup_momentum = warmup_momentum
-    args.last_opt_step = -1
 
     ################################### Calculate BPR ####################################
     if config_item['GET_PBR']:
@@ -327,15 +302,14 @@ def main_work(rank, world_size, args, logger):
                 model.load_state_dict(checkpoint, strict=False)
 
     #################################### Train Model ####################################
-    global epoch
-    epoch = 0
-    best_mAP = args.init_score
+    epoch = 1
+    best_mAP = 0.1
     best_perf = None
+    last_opt_step = -1
+    nw = max(round(warmup_epoch * len(train_loader)), 100)
     progress_bar = tqdm(range(start_epoch, num_epochs+1), ncols=115) if rank == 0 else range(start_epoch, num_epochs+1)
 
     for _ in progress_bar:
-        epoch += 1
-
         if rank == 0:
             message = f'[Epoch:{epoch:03d}/{len(progress_bar):03d}]'
             progress_bar.set_description(desc=message)
@@ -377,11 +351,8 @@ def main_work(rank, world_size, args, logger):
                     best_perf = eval_text
                     model_to_save = deepcopy(model.module).cpu() if hasattr(model, 'module') else deepcopy(model).cpu()
                     model_to_save.class_list = class_list
-                    save_item = {'epoch': epoch,
-                                'class_list': class_list,
-                                'model_state_dict': model_to_save.state_dict(),
-                                'optimizer_state_dict': optimizer.state_dict(),
-                                'scaler_state_dict': scaler.state_dict()}
+                    save_item = {'epoch': epoch, 'class_list': class_list, 'model_state_dict': model_to_save.state_dict(),
+                                 'optimizer_state_dict': optimizer.state_dict(), 'scaler_state_dict': scaler.state_dict()}
                     save_model(model=save_item, save_path=args.weight_dir / f'model_EP{epoch:03d}.pt')
 
                     analysis_result = analyse_mAP_info(mAP_info['all'], class_list)
@@ -389,12 +360,12 @@ def main_work(rank, world_size, args, logger):
                     data_df.to_csv(str(args.analysis_log_dir / f'dataframe_EP{epoch:03d}.csv'))
                     figure_AP.savefig(str(args.analysis_log_dir / f'figure-AP_EP{epoch:03d}.png'))
                     figure_dets.savefig(str(args.analysis_log_dir / f'figure-dets_EP{epoch:03d}.png'))
-
                     PR_curve_dir = args.analysis_log_dir / 'PR_curve' / f'EP{epoch:03d}'
                     os.makedirs(PR_curve_dir, exist_ok=True)
                     for class_id in fig_PR_curves.keys():
                         fig_PR_curves[class_id].savefig(str(PR_curve_dir / f'{class_list[class_id]}.png'))
                         fig_PR_curves[class_id].clf()
+        epoch += 1
 
     if (rank == 0) and (best_perf is not None):
         logging.warning(f' Best mAP@0.5: {best_mAP:.3f} at [Epoch:{best_epoch}/{num_epochs}]')
@@ -411,7 +382,6 @@ def main():
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='name to log training')
     parser.add_argument('--world_size', type=int, default=1, help='number of available GPU devices')
     parser.add_argument('--img_interval', type=int, default=10, help='image logging interval')
-    parser.add_argument('--init_score', type=float, default=0.1, help='initial mAP score for update best model')
     parser.add_argument('--sgd', action='store_true', help='use of SGD optimizer (default: Adam optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')

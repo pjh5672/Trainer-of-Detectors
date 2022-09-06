@@ -2,7 +2,7 @@
 
 ---
 
-## Contents
+## [Contents]
 1. [Description](#description)  
   1-1. [Data configuraion](#data-configuraion)  
   1-2. [Train configuraion](#train-configuraion)  
@@ -14,7 +14,7 @@
 
 ---
 
-## Description
+## [Description]
 
 This is repository for source code to train various object detection models. currently, It supports pretrained YOLOv3 weight(**darknet53.pt, yolov3.pt**) from [here](https://drive.google.com/drive/folders/15qXxbD7RG19uZBhG3NPWwfqt6OdksAPR?usp=sharing)
 
@@ -52,8 +52,7 @@ This is repository for source code to train various object detection models. cur
     (...see *.yaml.example file for more details)
 
 
-
-## Usage
+## [Usage]
 
 #### Train detector model
 
@@ -64,7 +63,6 @@ This is repository for source code to train various object detection models. cur
     - **world_size** : number of available GPU devices
     - **img_interval** : image logging interval
     - **start_eval** : starting epoch for mAP evaluation
-    - **init_score** : initial mAP score for update best model
     - **sgd** : use of SGD optimizer (default: Adam optimizer)
     - **linear_lr** : use of linear LR scheduler (default: one cyclic scheduler)
     - **no_amp** : use of FP32 training without AMP (default: AMP training)
@@ -157,7 +155,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
-| 09-06 | fix:make model training stable with adjust lr in early training |
+| 09-06 | fix:make model training stable with adjust lr in early training,loss accumulate mod |
 | 09-05 | add:data augmentation(albumentation, fliplr, random perspective transform) |
 | 09-04 | add:pretrained yolov3 weights excluding head update, fix:mae & bce loss nan due to large batch size |
 | 09-03 | add:PASCAL-VOC2012 data update, More than 20 figures memory comsumption warning |

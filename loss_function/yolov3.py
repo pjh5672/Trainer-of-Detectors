@@ -75,8 +75,7 @@ class YOLOv3_Loss():
             obj_loss += loss_obj
             noobj_loss += loss_noobj
             cls_loss += loss_cls
-            total_loss += self.coeff_coord * (loss_tx + loss_ty + loss_tw + loss_th) + \
-                          loss_obj + self.coeff_noobj * loss_noobj + loss_cls
+            total_loss += self.coeff_coord * (loss_tx + loss_ty + loss_tw + loss_th) + loss_obj + self.coeff_noobj * loss_noobj + loss_cls
 
         coord_loss /= self.batch_size
         obj_loss /= self.batch_size

@@ -9,6 +9,7 @@ if str(ROOT) not in sys.path:
 from .general import *
 from .process import *
 from .visualize import *
+from .optimizer import build_optimizer
 from .eval import Evaluator
 from .log import setup_primary_logging, setup_worker_logging, build_win_logger
 from .cache import make_cache_file
