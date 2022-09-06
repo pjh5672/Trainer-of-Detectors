@@ -29,7 +29,7 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | VOC2012 | 416 x 416 | 31.6 | 50.9 | 61.63 | 65.74 |
 
 
-#### Data configuraion
+### Data configuraion
 
  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
  - **`*.yaml` Arguments**
@@ -39,7 +39,7 @@ This is repository for source code to train various object detection models. cur
     - **mAP_FILE** : path of verification data file to be loaded for mAP metric calculation (automatically created when verification data is first loaded)
     - **NAMES** : list of category names the model will learn from
 
-#### Train configuraion
+### Train configuraion
 
  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
  - **`*.yaml` Arguments**
@@ -54,7 +54,7 @@ This is repository for source code to train various object detection models. cur
 
 ## [Usage]
 
-#### Train detector model
+### Train detector model
 
  - **Train Arguments**
     - **data_path** : path to data.yaml file
@@ -73,7 +73,7 @@ train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name tr
 ```
 
 
-#### Analyse training result
+### Analyse training result
 
  - **Log file**
 ```log
