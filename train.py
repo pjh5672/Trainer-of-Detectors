@@ -80,8 +80,6 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
         with amp.autocast(enabled=not args.no_amp):
             predictions = model(images)
             losses = criterion(predictions, targets)
-        if rank == 0:
-            logging.warning(f'nw: {nw}, ni: {ni}, last_opt_step: {last_opt_step}, accumulate: {accumulate}')
 
         scaler.scale(losses[0]).backward()
         if ni - last_opt_step >= accumulate:
