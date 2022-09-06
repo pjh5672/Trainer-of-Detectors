@@ -148,7 +148,7 @@ train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name tr
 $ pip install -r requirements.txt
 ```
 
-## Update
+## [Update]
 
 <details>
     <summary> Timeline in 2022 </summary>
@@ -185,6 +185,6 @@ $ pip install -r requirements.txt
 </details>
 
 
-## Contact
+## [Contact]
 - Author: Jiho Park  
 - Email: pjh5672.dev@gmail.com  
