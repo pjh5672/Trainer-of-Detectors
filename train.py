@@ -209,6 +209,12 @@ def main_work(rank, world_size, args, logger):
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
 
+    if rank == 0:
+        logging.warning(f'{train_set.data_info}')
+        logging.warning(f'{val_set.data_info}')
+        macs, params = profile(deepcopy(model), inputs=(torch.randn(1, input_channel, input_size, input_size),), verbose=False)
+        logging.warning(f'Params(M): {params/1e+6:.2f}, FLOPS(B): {2*macs/1E+9:.2f}')
+
     nbs = 64 # nominal batch size
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
     weight_decay *= batch_size * accumulate / nbs  # scale weight_decay
@@ -224,12 +230,6 @@ def main_work(rank, world_size, args, logger):
         lf = lambda x: ((1 - math.cos(x * math.pi / num_epochs)) / 2) * (lrf - 1) + 1
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scaler = amp.GradScaler(enabled=not args.no_amp)
-
-    if rank == 0:
-        logging.warning(f'{train_set.data_info}')
-        logging.warning(f'{val_set.data_info}')
-        macs, params = profile(deepcopy(model), inputs=(torch.randn(1, input_channel, input_size, input_size),), verbose=False)
-        logging.warning(f'Params(M): {params/1e+6:.2f}, FLOPS(B): {2*macs/1E+9:.2f}')
 
     ################################### Init Process ###################################
     setup(rank, world_size)
