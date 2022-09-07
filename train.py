@@ -61,14 +61,11 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
     optimizer.zero_grad()
 
     for index, mini_batch in enumerate(dataloader):
-        ni = index + len(dataloader) * current_epoch
-
         if index == 0:
             canvas_img = to_image(denormalize(mini_batch[0][0]))
             canvas_gt = mini_batch[1][0]
 
-        images, targets = mini_batch[0].cuda(rank, non_blocking=True), mini_batch[1]
-
+        ni = index + len(dataloader) * current_epoch
         if ni <= nw:
             xi = [0, nw]
             accumulate = max(1, np.interp(ni, xi, [1, nbs / batch_size]).round())
@@ -77,6 +74,7 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
                 if 'momentum' in x:
                     x['momentum'] = np.interp(ni, xi, [warmup_momentum, momentum])
 
+        images, targets = mini_batch[0].cuda(rank, non_blocking=True), mini_batch[1]
         with amp.autocast(enabled=not args.no_amp):
             predictions = model(images)
             losses = criterion(predictions, targets)
@@ -101,8 +99,8 @@ def execute_train(rank, args, dataloader, model, criterion, optimizer, scaler, c
                 monitor_text += f'{loss_name}: {loss_value.item():.3f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
-    total_loss /= len(dataloader)
 
+    total_loss /= len(dataloader)
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
 
@@ -128,7 +126,6 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
             canvas_img = to_image(denormalize(mini_batch[0][0]))
 
         images, targets, filenames, max_sides = mini_batch[0].cuda(rank, non_blocking=True), mini_batch[1], mini_batch[2], mini_batch[3]
-
         predictions = model(images)
         losses = criterion(predictions, targets)
         predictions = torch.cat(predictions, dim=1)
@@ -157,8 +154,8 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
                 monitor_text += f'{loss_name}: {loss_value.item():.3f} '
         if rank == 0:
             dataloader.set_postfix_str(s=f'{monitor_text}')
-    total_loss /= len(dataloader)
 
+    total_loss /= len(dataloader)
     if OS_SYSTEM == 'Linux':
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
         dist.all_gather_object(gather_objects, detections)
@@ -349,8 +346,7 @@ def main_work(rank, world_size, args, logger):
                 logging.warning(eval_text)
 
                 model_to_save = deepcopy(model.module).cpu() if hasattr(model, 'module') else deepcopy(model).cpu()
-                save_item = {'epoch': current_epoch,
-                             'class_list': class_list,
+                save_item = {'epoch': current_epoch, 'class_list': class_list,
                              'model_state_dict': model_to_save.state_dict(),
                              'optimizer_state_dict': optimizer.state_dict(),
                              'scaler_state_dict': scaler.state_dict()}
