@@ -4,11 +4,11 @@
 
 ## [Contents]
 1. [Description](#description)  
-  1-1. [Data configuraion](#data-configuraion)  
-  1-2. [Train configuraion](#train-configuraion)  
+  1-1. [Data Configuraion](#data-configuraion)  
+  1-2. [Train Configuraion](#train-configuraion)  
 2. [Usage](#usage)  
-  2-1. [Train detector model](#train-detector-model)  
-  2-2. [Analyse training result](#analyse-training-result)  
+  2-1. [Train Detector](#train-detector)  
+  2-2. [Analyse Result](#analyse-result)  
 3. [Update](#update)
 4. [Contact](#contact)
 
@@ -29,7 +29,7 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | VOC2012 | 416 x 416 | 31.6 | 50.9 | 61.63 | 65.74 |
 
 
-### Data configuraion
+### Data Configuraion
 
  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
  - **`*.yaml` Arguments**
@@ -39,7 +39,7 @@ This is repository for source code to train various object detection models. cur
     - **mAP_FILE** : path of verification data file to be loaded for mAP metric calculation (automatically created when verification data is first loaded)
     - **NAMES** : list of category names the model will learn from
 
-### Train configuraion
+### Train Configuraion
 
  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
  - **`*.yaml` Arguments**
@@ -49,12 +49,28 @@ This is repository for source code to train various object detection models. cur
     - **INPUT_SIZE** : size of input image (H,W) to be used for model calculation
     - **INPUT_CHANNEL** : size of input channel to be used for model calculation
     - **BATCH_SIZE** : size of the mini-batch to be calculated during one iteration of training  
+    - **INIT_LEARNING_RATE** : initial learning rate
+    - **FINAL_LEARNING_RATE** : final learning rate
+    - **WEIGHT_DECAY** : optimizer weight decay
+    - **MOMENTUM** : momentum in SGD/beta1 in Adam optimizer
+    - **WARMUP_EPOCH** : warmup epochs for stable initial training
+    - **WARMUP_MOMENTUM** : warmup initial momentum
+    - **WARMUP_BIAS_LR** : warmup initial bias lr
+    - **GET_PBR** : mode on/off for calculate possible best recalls
+    - **ANCHOR_IOU_THRESHOLD** : minimum threshold of overlap size with the predefined anchors to transform into learnable targets
+    - **MAX_DETS** : maximum number of predictions per a frame
+    - **MIN_SCORE_THRESH** : minimum threshold to filter out predictions by confidence score
+    - **MIN_IOU_THRESH** : minimum threshold of overlap size to merge out predictions by Non-Maximum Suppression
+    - **IGNORE_THRESH** : minimum threshold whether to include learning for no-object 
+    - **ANCHORS** : predefined anchor-boxes for small/medium/large scale
+    - **COEFFICIENT_COORD** : gain of boxes regression loss to be included in learning loss
+    - **COEFFICIENT_NOOBJ** : gain of no-object entropy loss to be included in learning loss
     (...see *.yaml.example file for more details)
 
 
 ## [Usage]
 
-### Train detector model
+### Train Detector
 
  - **Train Arguments**
     - **data_path** : path to data.yaml file
@@ -73,7 +89,7 @@ train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name tr
 ```
 
 
-### Analyse training result
+### Analyse Result
 
  - **Log file**
 ```log
@@ -155,7 +171,8 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
-| 09-06 | fix:make model training stable with adjust lr in early training,loss accumulate mod |
+| 09-07 | fix: resume mode in DDP |
+| 09-06 | fix:make model training stable with adjust lr in early training,loss accumulate mode |
 | 09-05 | add:data augmentation(albumentation, fliplr, random perspective transform) |
 | 09-04 | add:pretrained yolov3 weights excluding head update, fix:mae & bce loss nan due to large batch size |
 | 09-03 | add:PASCAL-VOC2012 data update, More than 20 figures memory comsumption warning |
