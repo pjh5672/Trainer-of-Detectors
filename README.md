@@ -29,8 +29,6 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | VOC2012 | 416 x 416 | 31.6 | 50.9 | 61.63 | 65.74 |
 
 
-## [Description]
-
 ### Data Configuraion
 
  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
