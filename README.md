@@ -9,7 +9,7 @@
 2. [Usage](#usage)  
   2-1. [Train Detector](#train-detector)  
   2-2. [Analyse Result](#analyse-result)  
-3. [Update](#update)
+3. [Update](#update)   
 4. [Contact](#contact)
 
 ---
