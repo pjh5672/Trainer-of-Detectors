@@ -1,0 +1,15 @@
+PATH: d:/DATASET/PASCAL-VOC/
+
+TRAIN: 
+ - images/train2007
+ - images/val2007
+ - images/train2012
+ - images/val2012
+VAL: 
+ - images/test2007
+
+mAP_FILE: ./evals/voc_val.json
+
+NAMES: ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair',
+        'cow', 'diningtable', 'dog', 'horse', 'motorbike', 'person', 'pottedplant',
+         'sheep', 'sofa', 'train', 'tvmonitor']

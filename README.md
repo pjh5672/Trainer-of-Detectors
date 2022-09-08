@@ -21,12 +21,12 @@ This is repository for source code to train various object detection models. cur
 
  - **<span style="background-color:#DCFFE4">Performance Benchmark</span>**
 
-| Model | Dataset | size<sup>(pixel) | mAP<sup>0.5:0.95 | mAP<sup>0.5 | Params(M) | FLOPS(B) |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
-| YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | COCO2017 | 416 x 416 | 31.2 | 55.4 | 61.95 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | COCO2017 | 416 x 416 | 26.0 | 44.3 | 61.95 | 66.17 |
-| YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | VOC2012 | 416 x 416 | - | 87.4 | 61.63 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | VOC2012 | 416 x 416 | 31.6 | 50.9 | 61.63 | 65.74 |
+| Model | Dataset | Train | Validation | size<sup>(pixel) | mAP<sup>0.5:0.95 | mAP<sup>0.5 | Params(M) | FLOPS(B) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
+| YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | MS-COCO | train2017 | val2017 | 416 x 416 | 31.2 | 55.4 | 61.95 | 65.86 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | MS-COCO | train2017 | val2017 | 416 x 416 | 26.0 | 44.3 | 61.95 | 66.17 |
+| YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | Pascal VOC | trainval2007+2012| test2007 | 416 x 416 | - | 87.4 | 61.63 | 65.86 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 x 416 | 31.6 | 50.9 | 61.63 | 65.74 |
 
 
 ### Data Configuraion
@@ -171,7 +171,8 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
-| 09-07 | fix: resume mode in DDP |
+| 09-09 | fix:VOC dataset  change for paper performance reproducing |
+| 09-07 | fix:resume mode in DDP |
 | 09-06 | fix:make model training stable with adjust lr in early training,loss accumulate mode |
 | 09-05 | add:data augmentation(albumentation, fliplr, random perspective transform) |
 | 09-04 | add:pretrained yolov3 weights excluding head update, fix:mae & bce loss nan due to large batch size |
