@@ -21,7 +21,7 @@ This is repository for source code to train various object detection models. cur
 
  - **<span style="background-color:#DCFFE4">Performance Benchmark</span>**
 
-| Model | Dataset | Train | Valid | Size<sup> | mAP<br><sup>(@0.5:0.95) | mAP<br><sup>(@0.5) | Params<br><sup>(M) | FLOPS<br><sup>(B) |
+| Model | Dataset | Train | Valid | Size<br><sup>(pixel) | mAP<br><sup>(@0.5:0.95) | mAP<br><sup>(@0.5) | Params<br><sup>(M) | FLOPS<br><sup>(B) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 31.2 | 55.4 | 61.95 | 65.86 |
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 26.0 | 44.3 | 61.95 | 66.17 |
