@@ -171,6 +171,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-14 | add:data augmentation with perspective transformation, random crop, mixup |
 | 09-09 | fix:VOC dataset  change for paper performance reproducing |
 | 09-07 | fix:resume mode in DDP |
 | 09-06 | fix:make model training stable with adjust lr in early training,loss accumulate mode |
