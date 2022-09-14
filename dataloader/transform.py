@@ -131,10 +131,10 @@ def transform_square_image(image, bboxes):
     img_h, img_w, img_c = image.shape
     max_size = max(img_h, img_w)
 
-    if img_h < max_side:
-        pad_h = max_side - img_h
-    if img_w < max_side:
-        pad_w = max_side - img_w
+    if img_h < max_size:
+        pad_h = max_size - img_h
+    if img_w < max_size:
+        pad_w = max_size - img_w
 
     square_image = np.zeros(shape=(img_h+pad_h, img_w+pad_w, img_c), dtype=image.dtype)
     square_image[:img_h, :img_w, :] = image

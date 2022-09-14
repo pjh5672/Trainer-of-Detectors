@@ -183,6 +183,7 @@ class Evaluator():
                 'AP_5095' : AP_5095}
         return res
 
+
     def split_areaRng(self, predictions):
         items = defaultdict(list)
         for item in predictions:
@@ -199,18 +200,19 @@ class Evaluator():
                 items[self.areaRngLbl[3]].append(item)
         return items
 
+
     def transform_pred_format(self, predictions):
         new_predictions = []
 
         for prediction in predictions:
-            filename, pred_yolo, max_side = prediction
+            filename, pred_yolo, max_size = prediction
             img_id = self.image_to_info[filename]['image_id']
             img_h = self.image_to_info[filename]['height']
             img_w = self.image_to_info[filename]['width']
 
             pred_voc = pred_yolo.copy()
-            pred_voc[:, 1:5][:,[0,2]] *= (max_side/img_w)
-            pred_voc[:, 1:5][:,[1,3]] *= (max_side/img_h)
+            pred_voc[:, 1:5][:,[0,2]] *= (max_size/img_w)
+            pred_voc[:, 1:5][:,[1,3]] *= (max_size/img_h)
             pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
             pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=img_w, scale_h=img_h)
 
@@ -224,6 +226,7 @@ class Evaluator():
                 new_predictions.append(pred_dict)
         return new_predictions
 
+
     def is_intersect(self, boxA, boxB):
         if boxA[0] > boxB[2]:
             return False  # boxA is right of boxB
@@ -235,6 +238,7 @@ class Evaluator():
             return False  # boxA is above boxB
         return True
 
+
     def get_intersection(self, boxA, boxB):
         xA = max(boxA[0], boxB[0])
         yA = max(boxA[1], boxB[1])
@@ -242,10 +246,12 @@ class Evaluator():
         yB = min(boxA[3], boxB[3])
         return (xB-xA+1) * (yB-yA+1)
 
+
     def get_union(self, boxA, boxB):
         area_A = (boxA[2]-boxA[0]+1) * (boxA[3]-boxA[1]+1)
         area_B = (boxB[2]-boxB[0]+1) * (boxB[3]-boxB[1]+1)
         return area_A + area_B
+
 
     def get_IoU(self, boxA, boxB):
         if self.is_intersect(boxA, boxB) is False:
@@ -254,6 +260,7 @@ class Evaluator():
         union = self.get_union(boxA, boxB)
         result = intersect / (union-intersect)
         return result
+
 
     def ElevenPointInterpolatedAP(self, rec, prec):
         mrec = [e for e in rec]

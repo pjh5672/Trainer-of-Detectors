@@ -77,7 +77,7 @@ class Dataset():
             image, target[:, 1:5], max_size = transform_square_image(image, target[:, 1:5])
             image = cv2.resize(image, dsize=(self.input_size, self.input_size))
         tensor = normalize(to_tensor(image))
-        return tensor, target, filename, max_side
+        return tensor, target, filename, max_size
     
 
     def replace_image2label_paths(self, image_paths):
@@ -208,14 +208,14 @@ class Dataset():
         images = []
         targets = []
         filenames = []
-        max_sides = []
+        max_sizes = []
         
-        for image, target, filename, max_side in mini_batch:
+        for image, target, filename, max_size in mini_batch:
             images.append(image)
             targets.append(target)
             filenames.append(filename)
-            max_sides.append(max_side)
-        return torch.stack(images, dim=0), targets, filenames, max_sides
+            max_sizes.append(max_size)
+        return torch.stack(images, dim=0), targets, filenames, max_sizes
 
 
 
@@ -241,7 +241,7 @@ if __name__ == '__main__':
                 images = minibatch[0]
                 targets = minibatch[1]
                 filenames = minibatch[2]
-                max_sides = minibatch[3]
+                max_sizes = minibatch[3]
     
                 if index % 30 == 0:
-                    print(f"{phase} - {index}/{len(dataloaders[phase])} - {max_sides}")
+                    print(f"{phase} - {index}/{len(dataloaders[phase])} - {max_sizes}")

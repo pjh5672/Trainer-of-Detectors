@@ -125,7 +125,7 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
         if index == 0:
             canvas_img = to_image(denormalize(mini_batch[0][0]))
 
-        images, targets, filenames, max_sides = mini_batch[0].cuda(rank, non_blocking=True), mini_batch[1], mini_batch[2], mini_batch[3]
+        images, targets, filenames, max_sizes = mini_batch[0].cuda(rank, non_blocking=True), mini_batch[1], mini_batch[2], mini_batch[3]
         predictions = model(images)
         losses = criterion(predictions, targets)
         predictions = torch.cat(predictions, dim=1)
@@ -135,13 +135,13 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
         if current_epoch >= args.start_eval:
             for idx in range(len(filenames)):
                 filename = filenames[idx]
-                max_side = max_sides[idx]
+                max_size = max_sizes[idx]
                 pred_yolo = predictions[idx].cpu().numpy()
                 pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
                 pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
                 pred_yolo = run_NMS_for_YOLO(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'])
                 if len(pred_yolo) > 0:
-                    detections.append((filename, pred_yolo, max_side))
+                    detections.append((filename, pred_yolo, max_size))
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
