@@ -24,7 +24,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from thop import profile
 from tqdm import tqdm, trange
 
-from dataloader import Dataset, Transformer, to_image, denormalize
+from dataloader import Dataset, to_image, denormalize
 from models import YOLOv3_Model
 from loss_function import YOLOv3_Loss
 from utils import *
@@ -187,7 +187,6 @@ def main_work(rank, world_size, args, logger):
 
     input_size = config_item['INPUT_SIZE']
     input_channel = config_item['INPUT_CHANNEL']
-    class_list = data_item['NAMES']
     lr0 = config_item['INIT_LEARNING_RATE']
     lrf = config_item['FINAL_LEARNING_RATE']
     weight_decay = config_item['WEIGHT_DECAY']
@@ -197,12 +196,10 @@ def main_work(rank, world_size, args, logger):
     warmup_epoch = config_item['WARMUP_EPOCH']
     warmup_momentum = config_item['WARMUP_MOMENTUM']
     warmup_bias_lr = config_item['WARMUP_BIAS_LR']
-
+    class_list = data_item['NAMES']
     color_list = generate_random_color(num_colors=len(class_list))
-    train_transformer = Transformer(phase='train', input_size=input_size)
-    val_transformer = Transformer(phase='val', input_size=input_size)
-    train_set = Dataset(data_path=args.data_path, phase='train', rank=rank, time_created=TIMESTAMP, transformer=train_transformer)
-    val_set = Dataset(data_path=args.data_path, phase='val', rank=rank, time_created=TIMESTAMP, transformer=val_transformer)
+    train_set = Dataset(args=args, phase='train', rank=rank, time_created=TIMESTAMP)
+    val_set = Dataset(args=args, phase='val', rank=rank, time_created=TIMESTAMP)
     model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
 
@@ -346,7 +343,8 @@ def main_work(rank, world_size, args, logger):
                 logging.warning(eval_text)
 
                 model_to_save = deepcopy(model.module).cpu() if hasattr(model, 'module') else deepcopy(model).cpu()
-                save_item = {'epoch': current_epoch, 'class_list': class_list,
+                save_item = {'epoch': current_epoch,
+                             'class_list': class_list,
                              'model_state_dict': model_to_save.state_dict(),
                              'optimizer_state_dict': optimizer.state_dict(),
                              'scaler_state_dict': scaler.state_dict()}
@@ -380,7 +378,7 @@ def main_work(rank, world_size, args, logger):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='path to data.yaml file')
-    parser.add_argument('--config_path', type=str, default='config/yolov3.yaml', help='path to config.yaml file')
+    parser.add_argument('--config_path', type=str, default='config/yolov3_coco.yaml', help='path to config.yaml file')
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='name to log training')
     parser.add_argument('--world_size', type=int, default=1, help='number of available GPU devices')
     parser.add_argument('--img_interval', type=int, default=10, help='image logging interval')

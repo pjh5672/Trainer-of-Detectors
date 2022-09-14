@@ -1,0 +1,45 @@
+#--------------------- Weight File ---------------------#
+RESUME_PATH: null
+PRETRAINED_PATH: ./weights/yolov3_coco.pt
+
+#--------------------- Train Param ---------------------#
+NUM_EPOCHS: 500
+INPUT_SIZE: 416
+INPUT_CHANNEL: 3
+BATCH_SIZE: 64
+INIT_LEARNING_RATE: 0.001
+FINAL_LEARNING_RATE: 0.1
+WEIGHT_DECAY: 0.0005
+MOMENTUM: 0.9
+WARMUP_EPOCH: 3.0
+WARMUP_MOMENTUM: 0.8
+WARMUP_BIAS_LR: 0.1
+
+GET_PBR: False
+ANCHOR_IOU_THRESHOLD: 0.25
+ANCHORS:
+  ANCHOR_S: [[10, 13], [16, 30], [33, 23]]
+  ANCHOR_M: [[30, 61], [62, 45], [59, 119]]
+  ANCHOR_L: [[116, 90], [156, 198], [373, 326]]
+
+#--------------------- Augment Param ---------------------#
+FLIP_UD: 0.0
+FLIP_LR: 0.5
+HSV_H: 0.015
+HSV_S: 0.7
+HSV_V: 0.4
+ROTATE: 10
+SHIFT: 0.2
+SCALE: 0.6
+PERSPECTIVE: 0.0001
+MIXUP: 0.5
+
+#--------------------- AP Metric Param ---------------------#
+MAX_DETS: 100
+MIN_SCORE_THRESH: 0.001
+MIN_IOU_THRESH: 0.65
+
+#--------------------- Loss Param ---------------------#
+IGNORE_THRESH: 0.2
+COEFFICIENT_COORD: 5.0
+COEFFICIENT_NOOBJ: 0.2

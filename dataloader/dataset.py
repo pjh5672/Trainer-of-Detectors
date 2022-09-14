@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import random
 from pathlib import Path
 from datetime import datetime
 
@@ -15,30 +16,33 @@ ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from transform import Transformer
+from transform import *
 from utils import *
 
 
 
 class Dataset():
-    def __init__(self, data_path, phase, rank, time_created, transformer=None):
-        with open(data_path) as f:
-            data_item = yaml.load(f, Loader=yaml.FullLoader)
+    def __init__(self, args, phase, rank, time_created):
+        with open(args.data_path, mode='r') as f:
+            self.data_item = yaml.load(f, Loader=yaml.FullLoader)
+        with open(args.config_path, mode='r') as f:
+            self.config_item = yaml.load(f, Loader=yaml.FullLoader)
         
-        self.data_dir = Path(data_item['PATH'])
-        self.classname_list = data_item['NAMES']
+        self.data_dir = Path(self.data_item['PATH'])
+        self.classname_list = self.data_item['NAMES']
+        self.input_size = self.config_item['INPUT_SIZE']
         self.phase = phase
         
         self.image_paths = []
-        for sub_dir in data_item[self.phase.upper()]:
+        for sub_dir in self.data_item[self.phase.upper()]:
             image_dir = self.data_dir / sub_dir
             self.image_paths += [str(image_dir / fn) for fn in os.listdir(image_dir) if fn.lower().endswith(('png', 'jpg', 'jpeg'))]
         self.label_paths = self.replace_image2label_paths(self.image_paths)
         self.generate_no_label(self.label_paths)
 
-        GT_dir = Path(data_path).parent / 'evals'
-        cache_dir = Path(data_path).parent / 'caches'
-        save_name = Path(data_path).name.split('.')[0]
+        GT_dir = Path(args.data_path).parent / 'evals'
+        cache_dir = Path(args.data_path).parent / 'caches'
+        save_name = Path(args.data_path).name.split('.')[0]
          
         if self.phase == 'val':
             self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase, rank=rank)
@@ -50,22 +54,30 @@ class Dataset():
 
         cache, self.data_info = make_cache_file(cache_dir=cache_dir, file_name=save_name, phase=phase, data_path=data_path, time_created=time_created)
         assert len(self.image_paths) == len(list(cache.keys())), "Not match loaded files wite cache files"
-        self.transformer = transformer
+        self.album_transform = Albumentations(p_flipud=self.config_item['FLIP_UD'], p_fliplr=self.config_item['FLIP_LR'])
 
 
     def __len__(self): return len(self.image_paths)
     
     
     def __getitem__(self, index):
-        max_side, pad_h, pad_w = 0, 0, 0
-        filename, image = self.get_image(index)
-        class_ids, bboxes = self.get_label(index)
-        bboxes = clip_box_coordinates(bboxes)
-        target = np.concatenate((class_ids[:, np.newaxis], bboxes), axis=1)
-        
-        if self.transformer:
-            image, target, max_side = self.transformer(image=image, target=target)
-        return image, target, filename, max_side
+        filename, image, target = self.get_item(index)
+        if self.phase == 'train':
+            max_size = 0
+            image, target = self.augment_item(image=image, target=target)
+            if random.random() <= self.config_item['MIXUP']:
+                _, image2, target2 = self.get_item(random.randint(0, len(self)-1))
+                image2, target2 = self.augment_item(image=image2, target=target2)
+                image, target = mixup(image1=image, target1=target, image2=image2, target2=target2)
+            if len(target) == 0:
+                target = np.array([[-1, 0., 0., self.input_size, self.input_size]], dtype=np.float32)
+            target[:, 1:5] = scale_to_norm(target[:, 1:5], image_w=self.input_size, image_h=self.input_size)
+            target[:, 1:5] = box_transform_x1y1x2y2_to_xcycwh(target[:, 1:5])
+        else:
+            image, target[:, 1:5], max_size = transform_square_image(image, target[:, 1:5])
+            image = cv2.resize(image, dsize=(self.input_size, self.input_size))
+        tensor = normalize(to_tensor(image))
+        return tensor, target, filename, max_side
     
 
     def replace_image2label_paths(self, image_paths):
@@ -73,6 +85,37 @@ class Dataset():
         return [sb.join(x.rsplit(sa, 1)).rsplit('.', 1)[0] + '.txt' for x in image_paths]
     
     
+    def get_item(self, index):
+        filename, image = self.get_image(index)
+        class_ids, bboxes = self.get_label(index)
+        bboxes = clip_box_coordinates(bboxes)
+        target = np.concatenate((class_ids[:, np.newaxis], bboxes), axis=1)
+        return filename, image, target
+
+
+    def augment_item(self, image, target):
+        img_h, img_w, _ = image.shape
+        image, target = self.album_transform(image=image, target=target)
+        image = augment_hsv(image, 
+                            hgain=self.config_item['HSV_H'], 
+                            sgain=self.config_item['HSV_S'], 
+                            vgain=self.config_item['HSV_V'])
+        target[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(target[:, 1:5])
+        target[:, 1:5] = scale_to_original(target[:, 1:5], scale_w=img_w, scale_h=img_h)
+        image, target = random_perspective(image, target,
+                                           input_size=self.input_size,
+                                           degrees=self.config_item['ROTATE'], 
+                                           translate=self.config_item['SHIFT'], 
+                                           scale=self.config_item['SCALE'], 
+                                           perspective=self.config_item['PERSPECTIVE'])
+        image, target = random_crop(image, target,
+                                    x_max=img_w if img_w > self.input_size else self.input_size, 
+                                    y_max=img_h if img_h > self.input_size else self.input_size, 
+                                    crop_size=self.input_size)
+        idx = box_candidates(box1=target[:, 1:5].T, wh_thr=4, ar_thr=20)
+        return image, target[idx]
+
+
     def get_image(self, index):
         filename = self.image_paths[index].split(os.sep)[-1]
         image = cv2.imread(self.image_paths[index])
@@ -182,11 +225,11 @@ if __name__ == '__main__':
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
 
-    data_path = ROOT / 'data' / 'coco128.yaml'
-    train_transformer = Transformer(phase='train', input_size=416)
-    train_dataset = Dataset(data_path, phase='train', rank=0, time_created=0, transformer=train_transformer)
-    val_transformer = Transformer(phase='val', input_size=416)
-    val_dataset = Dataset(data_path, phase='val', rank=0, time_created=0, transformer=val_transformer)
+    class args:
+        data_path = ROOT / 'data' / 'coco128.yaml'
+        config_path = ROOT / 'config' / 'yolov3_coco.yaml'
+    train_dataset = Dataset(args=args, phase='train', rank=0, time_created=0)
+    val_dataset = Dataset(args=args, phase='val', rank=0, time_created=0)
     dataloaders = {}
     dataloaders['train'] = DataLoader(train_dataset, batch_size=1, collate_fn=Dataset.collate_fn, pin_memory=True)
     dataloaders['val'] = DataLoader(val_dataset, batch_size=1, collate_fn=Dataset.collate_fn, pin_memory=True)         

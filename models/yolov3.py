@@ -9,7 +9,6 @@ from yolov3_modules import Darknet53_backbone, YOLOv3_FPN, YOLOv3_head
 class YOLOv3_Model(nn.Module):
     def __init__(self, config_path, num_classes):
         super().__init__()
-    
         with open(config_path) as f:
             item = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -46,7 +45,7 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
 
-    config_path = ROOT / 'config' / 'yolov3.yaml'
+    config_path = ROOT / 'config' / 'yolov3_coco.yaml'
     num_classes = 80
     device = torch.device('cpu')
 
