@@ -1,8 +1,8 @@
-#--------------------- Weight File ---------------------#
+#--------------------- Weight Parameter ---------------------#
 RESUME_PATH: null
 PRETRAINED_PATH: ./weights/yolov3_voc.pt
 
-#--------------------- Train Param ---------------------#
+#--------------------- Train Parameter ---------------------#
 NUM_EPOCHS: 500
 INPUT_SIZE: 416
 INPUT_CHANNEL: 3
@@ -22,7 +22,7 @@ ANCHORS:
   ANCHOR_M: [[30, 61], [62, 45], [59, 119]]
   ANCHOR_L: [[116, 90], [156, 198], [373, 326]]
 
-#--------------------- Augment Param ---------------------#
+#--------------------- Augment Parameter ---------------------#
 FLIP_UD: 0.0
 FLIP_LR: 0.5
 HSV_H: 0.015
@@ -34,12 +34,12 @@ SCALE: 0.6
 PERSPECTIVE: 0.0001
 MIXUP: 0.2
 
-#--------------------- AP Metric Param ---------------------#
+#--------------------- AP Metric Parameter ---------------------#
 MAX_DETS: 100
 MIN_SCORE_THRESH: 0.001
 MIN_IOU_THRESH: 0.65
 
-#--------------------- Loss Param ---------------------#
+#--------------------- Loss Parameter ---------------------#
 IGNORE_THRESH: 0.2
 COEFFICIENT_COORD: 5.0
 COEFFICIENT_NOOBJ: 0.2

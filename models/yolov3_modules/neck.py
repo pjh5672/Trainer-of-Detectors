@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from element import ConvLayer
+from element import ConvLayer, weight_init_kaiming_uniform
 
 
 class TopDownLayer(nn.Module):
@@ -34,6 +34,8 @@ class YOLOv3_FPN(nn.Module):
         self.topdown3 = TopDownLayer(384, 128)
         self.upsample = nn.Upsample(scale_factor=2)
 
+        self.apply(weight_init_kaiming_uniform)
+
 
     def forward(self, x1, x2, x3):
         C1 = self.topdown1(x1)
@@ -42,6 +44,9 @@ class YOLOv3_FPN(nn.Module):
         P2 = self.upsample(self.conv2(C2))
         C3 = self.topdown3(torch.cat((P2, x3), dim=1))
         return C1, C2, C3
+
+
+    
 
 
 

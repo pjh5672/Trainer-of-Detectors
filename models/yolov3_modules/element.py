@@ -2,6 +2,12 @@ import torch
 import torch.nn as nn
 
 
+def weight_init_kaiming_uniform(module):
+    if isinstance(module, nn.Conv2d):
+        nn.init.kaiming_uniform_(module.weight)
+    elif isinstance(module, nn.BatchNorm2d):
+        module.weight.data.fill_(1.0)
+
 
 class ConvLayer(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding, lrelu_neg_slope=0.1):
@@ -15,7 +21,6 @@ class ConvLayer(nn.Module):
         out = self.bn(out)
         out = self.lrelu(out)
         return out
-
 
 
 class ResBlock(nn.Module):

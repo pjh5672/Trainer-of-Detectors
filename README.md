@@ -8,7 +8,8 @@
   1-2. [Train Configuraion](#train-configuraion)  
 2. [Usage](#usage)  
   2-1. [Train Detector](#train-detector)  
-  2-2. [Analyse Result](#analyse-result)  
+  2-2. [Validate mAP metric](#validate-map-metric)  
+  2-3. [Analyse Result](#analyse-result)  
 3. [Update](#update)   
 4. [Contact](#contact)
 
@@ -19,7 +20,7 @@
 This is repository for source code to train various object detection models. currently, You can download related weight files from [here](https://drive.google.com/drive/folders/15qXxbD7RG19uZBhG3NPWwfqt6OdksAPR?usp=sharing)
 
 
- - **<span style="background-color:#DCFFE4">Performance Benchmark</span>**
+ - **Performance Benchmark**
 
 | Model | Dataset | Train | Valid | Size<br><sup>(pixel) | mAP<br><sup>(@0.5:0.95) | mAP<br><sup>(@0.5) | Params<br><sup>(M) | FLOPS<br><sup>(B) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
@@ -31,20 +32,29 @@ This is repository for source code to train various object detection models. cur
 
 ### Data Configuraion
 
- - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
- - **`*.yaml` Arguments**
-    - **`PATH`** : path to the directory containing the dataset
-    - **`TRAIN`** : path where training images are stored
-    - **`VAL`** : path where the image for verification is stored
-    - **`mAP_FILE`** : path of verification data file to be loaded for mAP metric calculation (automatically created when verification data is first loaded)
-    - **`NAMES`** : list of category names the model will learn from
+<details>
+<summary> Data.yaml Argument </summary>
+
+  - You can copy *.yaml.example to *.yaml and use it as a training argument
+  - **`PATH`** : path to the directory containing the dataset
+  - **`TRAIN`** : path where training images are stored
+  - **`VAL`** : path where the image for verification is stored
+  - **`mAP_FILE`** : path of verification data file to be loaded for mAP metric calculation (automatically created when verification data is first loaded)
+  - **`NAMES`** : list of category names the model will learn from
+
+</details>
 
 ### Train Configuraion
 
- - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument.
- - **`*.yaml` Arguments**
+<details>
+<summary> Config.yaml Argument </summary>
+
+  - You can copy `*.yaml.example` to `*.yaml` and use it as a training argument  
+  - **Weight Parameter**
     - **`RESUME_PATH`** : checkpoint path to be loaded when continuing training on a model that has stopped training (ckechpoint consists of model_state_dict, optimizer_state_dict, epoch)
     - **`PRETRAINED_PATH`** : path of pre-trained weights file (only model_state_dict is wrapped)
+
+  - **Train Parameter**
     - **`NUM_EPOCHS`** : number of epochs to train the model
     - **`INPUT_SIZE`** : size of input image (H,W) to be used for model calculation
     - **`INPUT_CHANNEL`** : size of input channel to be used for model calculation
@@ -58,49 +68,99 @@ This is repository for source code to train various object detection models. cur
     - **`WARMUP_BIAS_LR`** : warmup initial bias lr
     - **`GET_PBR`** : mode on/off for calculate possible best recalls
     - **`ANCHOR_IOU_THRESHOLD`** : minimum threshold of overlap size with the predefined anchors to transform into learnable targets
+    - **`ANCHORS`** : the width and height of the predefined anchor boxes for small/medium/large scale
+
+  - **Augment Parameter**
+    - **`FLIP_UD`** : Probability for flipping up/down of data
+    - **`FLIP_LR`** : Probability for flipping left/right of data
+    - **`HSV_H`** : Random distribution range to change the color of hue in hsv
+    - **`HSV_S`** : Shift limit for change of hue in HSV color space 
+    - **`HSV_V`** : Shift limit for change of value in HSV color space 
+    - **`ROTATE`** : Shift limit for change of saturation in HSV color space 
+    - **`SHIFT`** : Limit the range of moving up, down, left, and right
+    - **`SCALE`** : Limit the range to zoom in/out of data
+    - **`PERSPECTIVE`** : Degree Limit to which perspective transformation is applied
+    - **`MIXUP`** : Probability for applying mixup augmentation
+
+  - **AP Metric Parameter**
     - **`MAX_DETS`** : maximum number of predictions per a frame
     - **`MIN_SCORE_THRESH`** : minimum threshold to filter out predictions by confidence score
     - **`MIN_IOU_THRESH`** : minimum threshold of overlap size to merge out predictions by Non-Maximum Suppression
+
+  - **Loss Parameter**
     - **`IGNORE_THRESH`** : minimum threshold whether to include learning for no-object 
-    - **`ANCHORS`** : predefined anchor-boxes for small/medium/large scale
     - **`COEFFICIENT_COORD`** : gain of boxes regression loss to be included in learning loss
     - **`COEFFICIENT_NOOBJ`** : gain of no-object entropy loss to be included in learning loss
-    (...see *.yaml.example file for more details)
+
+</details>
 
 
 ## [Usage]
 
 ### Train Detector
 
- - **Train Arguments**
-    - **`data_path`** : path to data.yaml file
-    - **`config_path`** : path to config.yaml file
-    - **`exp_name`** : name to log training
-    - **`world_size`** : number of available GPU devices
-    - **`img_interval`** : image logging interval
-    - **`start_eval`** : starting epoch for mAP evaluation
-    - **`linear_lr`** : use of linear LR scheduler (default: one cyclic scheduler)
-    - **`no_amp`** : use of FP32 training without AMP (default: AMP training)
-    - **`sgd`** : use of SGD optimizer (default: Adam optimizer)
+<details>
+<summary> Training Argument </summary>
+
+  - **`data_path`** : path to data.yaml file
+  - **`config_path`** : path to config.yaml file
+  - **`exp_name`** : name to log training
+  - **`world_size`** : number of available GPU devices
+  - **`img_interval`** : image logging interval
+  - **`start_eval`** : starting epoch for mAP evaluation
+  - **`linear_lr`** : use of linear LR scheduler (default: one cyclic scheduler)
+  - **`no_amp`** : use of FP32 training without AMP (default: AMP training)
+  - **`sgd`** : use of SGD optimizer (default: Adam optimizer)
+  - **`freeze_backbone`** : freeze backbone layers (default: False)
+
+</details>
 
 ```python
 # simple example on parallel training on 2 GPUs
-train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name train --world_size 2
+python train.py --data_path data/coco128.yaml --config config/yolov3_coco.yaml --exp_name train --world_size 2
 ```
 
+### Validate mAP metric
+
+<details>
+<summary> Validating Argument </summary>
+
+  - **`data_path`** : path to data.yaml file
+  - **`config_path`** : path to config.yaml file
+  - **`model_path`** : path to trained model weight
+  - **`rank`** : GPU device index for running
+
+</details>
+
+```python
+# simple example on parallel training on 2 GPUs
+python val.py --data_path data/voc.yaml --config config/yolov3_voc.yaml --model_path weight/voc_best.pt
+```
+
+ - Terminal Output
+    ```log
+      - Average Precision (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.486
+      - Average Precision (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.720
+      - Average Precision (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.535
+      - Average Precision (AP) @[ IoU=0.50      | area= small | maxDets=100 ] = 0.184
+      - Average Precision (AP) @[ IoU=0.50      | area=medium | maxDets=100 ] = 0.508
+      - Average Precision (AP) @[ IoU=0.50      | area= large | maxDets=100 ] = 0.766
+    ```
 
 ### Analyse Result
 
- - **Log file**
-```log
-2022-08-23 13:41:49 | Rank 0 | [TRAIN] hash: 19314466396 version: 2022-08-04_18-17 
-2022-08-23 13:41:49 | Rank 0 | [VAL] hash: 814705164 version: 2022-08-04_18-17 
-2022-08-23 13:41:53 | Rank 0 | Params(M): 61.95, FLOPS(B): 66.17
-2022-08-23 13:41:53 | Rank 0 | Path to pretrained model: ./weights/yolov3.pt
+<details>
+<summary> Log file </summary>
 
-2022-08-23 14:05:38 | Rank 0 | [Epoch:001/300] Train Loss: 173.23, Val Loss: 179.45
-2022-08-23 14:06:03 | Rank 0 | [Epoch:001/300] mAP Computation Time(sec): 25.7212
-2022-08-23 14:06:03 | Rank 0 | 
+```log
+2022-09-09 09:53:18 | Rank 0 | [TRAIN] hash: 1780273991 version: 2022-09-09_08-14 
+2022-09-09 09:53:18 | Rank 0 | [VAL] hash: 434734692 version: 2022-09-09_08-14 
+2022-09-09 09:53:19 | Rank 0 | Params(M): 61.63, FLOPS(B): 65.74
+2022-09-09 09:53:22 | Rank 0 | Path to pretrained model: ./weights/yolov3.pt
+
+2022-09-09 09:57:28 | Rank 0 | [Epoch:001/1000] Train Loss: 173.23, Val Loss: 179.45
+2022-09-09 10:01:23 | Rank 0 | [Epoch:001/1000] mAP Computation Time(sec): 25.7212
+2022-09-09 10:05:18 | Rank 0 | 
 	 - Average Precision (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.070
 	 - Average Precision (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.160
 	 - Average Precision (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.051
@@ -110,51 +170,80 @@ train.py --data_path data/coco128.yaml --config config/yolov3.yaml --exp_name tr
 
                                         ...
 
-2022-08-24 17:03:50 | Rank 0 | [Epoch:053/300] Train Loss: 125.79, Val Loss: 145.82
-2022-08-24 17:04:19 | Rank 0 | [Epoch:053/300] mAP Computation Time(sec): 29.5476
-2022-08-24 17:04:19 | Rank 0 | 
-	 - Average Precision (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.144
-	 - Average Precision (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.280
-	 - Average Precision (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.131
-	 - Average Precision (AP) @[ IoU=0.50      | area= small | maxDets=100 ] = 0.044
-	 - Average Precision (AP) @[ IoU=0.50      | area=medium | maxDets=100 ] = 0.199
-	 - Average Precision (AP) @[ IoU=0.50      | area= large | maxDets=100 ] = 0.395
+2022-09-12 09:32:56 | Rank 0 |  Best mAP@0.5: 0.720 at [Epoch:929/1000]
+2022-09-12 09:32:56 | Rank 0 | 
+	 - Average Precision (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.486
+	 - Average Precision (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.720
+	 - Average Precision (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.535
+	 - Average Precision (AP) @[ IoU=0.50      | area= small | maxDets=100 ] = 0.184
+	 - Average Precision (AP) @[ IoU=0.50      | area=medium | maxDets=100 ] = 0.508
+	 - Average Precision (AP) @[ IoU=0.50      | area= large | maxDets=100 ] = 0.766
 ```
 
-
- - **PR curve per category**
-   <div align="center">
-   <a href=""><img src=./asset/PR_curve/airplane.png width="19%" /></a>
-   <a href=""><img src=./asset/PR_curve/boat.png width="19%" /></a>
-   <a href=""><img src=./asset/PR_curve/car.png width="19%" /></a>
-   <a href=""><img src=./asset/PR_curve/dog.png width="19%" /></a>
-   <a href=""><img src=./asset/PR_curve/person.png width="19%" /></a>
-   </div>
+</details>
 
 
- - **AP score per category & Detection rate**
-   <div align="center">
-   <a href=""><img src=./asset/figure-AP.png width="49%" /></a>
-   <a href=""><img src=./asset/figure-dets.png width="49%" /></a>
-   </div>
- 
+<details>
+<summary> PR curve per category </summary>
 
- - **Image file**
-    - train image(top row) and validation result(bottom row) at 10,20,30,40,50 epoch
-   <div align="center">
-   <a href=""><img src=./asset/images/train/EP010.jpg width="15%" /></a>
-   <a href=""><img src=./asset/images/train/EP020.jpg width="15%" /></a>
-   <a href=""><img src=./asset/images/train/EP030.jpg width="15%" /></a>
-   <a href=""><img src=./asset/images/train/EP040.jpg width="15%" /></a>
-   <a href=""><img src=./asset/images/train/EP050.jpg width="15%" /></a>
-   </div>
-   <div align="center">
-   <a href=""><img src=./asset/images/val/EP010.jpg width="15%" /></a>
-   <a href=""><img src=./asset/images/val/EP020.jpg width="15%" /></a>
-   <a href=""><img src=./asset/images/val/EP030.jpg width="15%" /></a>
-   <a href=""><img src=./asset/images/val/EP040.jpg width="15%" /></a>
-   <a href=""><img src=./asset/images/val/EP050.jpg width="15%" /></a>
-   </div>
+<div align="center">
+   <a href=""><img src=./asset/PR_curve/aeroplane.png width="16%" /></a>
+   <a href=""><img src=./asset/PR_curve/bicycle.png width="16%" /></a>
+   <a href=""><img src=./asset/PR_curve/boat.png width="16%" /></a>
+   <a href=""><img src=./asset/PR_curve/bus.png width="16%" /></a>
+   <a href=""><img src=./asset/PR_curve/car.png width="16%" /></a>
+   <a href=""><img src=./asset/PR_curve/cat.png width="16%" /></a>
+</div>
+
+</details>
+
+
+<details>
+<summary> AP score per category </summary>
+
+<div align="center">
+  <a href=""><img src=./asset/figure-AP_EP929.png width="60%" /></a>
+</div>
+
+</details>
+
+
+<details>
+<summary> Detection rate </summary>
+
+<div align="center">
+  <a href=""><img src=./asset/figure-dets_EP929.png width="60%" /></a>
+</div>
+
+</details>
+
+
+<details>
+<summary> Image file </summary>
+
+<div align="center">
+  <a href=""><img src=./asset/images/train/EP100.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/train/EP200.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/train/EP300.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/train/EP400.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/train/EP500.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/train/EP600.jpg width="16%" /></a>
+</div>
+
+<div align="center">
+  <a href=""><img src=./asset/images/val/EP100.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/val/EP200.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/val/EP300.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/val/EP400.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/val/EP500.jpg width="16%" /></a>
+  <a href=""><img src=./asset/images/val/EP600.jpg width="16%" /></a>
+</div>
+
+<div align="center">
+  - Train image(top row) and validation result(bottom row) at 100, 200, 300, 400, 500, 600 epoch
+</div>
+
+</details>
 
 
 ---
@@ -171,6 +260,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-15 | add:val.py for reproducing mAP with trained model |
 | 09-14 | add:data augmentation with perspective transformation, random crop, mixup |
 | 09-09 | fix:VOC dataset  change for paper performance reproducing |
 | 09-07 | fix:resume mode in DDP |

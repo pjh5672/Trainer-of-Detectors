@@ -200,7 +200,7 @@ def main_work(rank, world_size, args, logger):
     color_list = generate_random_color(num_colors=len(class_list))
     train_set = Dataset(args=args, phase='train', rank=rank, time_created=TIMESTAMP)
     val_set = Dataset(args=args, phase='val', rank=rank, time_created=TIMESTAMP)
-    model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
+    model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list), freeze_backbone=args.freeze_backbone)
     criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
 
     if rank == 0:
@@ -216,7 +216,7 @@ def main_work(rank, world_size, args, logger):
 
     val_file = args.data_path.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
-    evaluator = Evaluator(GT_file=val_file, config=config_item)
+    evaluator = Evaluator(GT_file=val_file, maxDets=config_item['MAX_DETS'])
 
     if args.linear_lr:
         lf = lambda x: (1 - x / num_epochs) * (1.0 - lrf) + lrf
@@ -386,6 +386,7 @@ def main():
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')
     parser.add_argument('--start_eval', type=int, default=50, help='starting epoch for mAP evaluation')
+    parser.add_argument('--freeze_backbone', action='store_true', help='freeze backbone layers (default: False)')
 
     args = parser.parse_args()
     args.data_path = ROOT / args.data_path

@@ -3,14 +3,15 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from element import ConvLayer, ResBlock
+from element import ConvLayer, ResBlock, weight_init_kaiming_uniform
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]
 
 
+
 class Darknet53_backbone(nn.Module):
-    def __init__(self):
+    def __init__(self, freeze_grad=False):
         super().__init__()
         self.conv1 = ConvLayer(3, 32, 3, stride=1, padding=1)
         self.res_block1 = self._build_Conv_and_ResBlock(32, 64, 1)
@@ -18,8 +19,12 @@ class Darknet53_backbone(nn.Module):
         self.res_block3 = self._build_Conv_and_ResBlock(128, 256, 8)
         self.res_block4 = self._build_Conv_and_ResBlock(256, 512, 8)
         self.res_block5 = self._build_Conv_and_ResBlock(512, 1024, 4)
-
-        self.apply(self._weight_init_kaiming_uniform)
+        
+        self.apply(weight_init_kaiming_uniform)
+        
+        if freeze_grad:
+            for param in self.parameters():
+                param.requires_grad = False
 
 
     def forward(self, x):

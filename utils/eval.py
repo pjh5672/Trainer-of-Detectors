@@ -7,14 +7,14 @@ from utils import box_transform_xcycwh_to_x1y1x2y2, scale_to_original
 
 
 class Evaluator():
-    def __init__(self, GT_file, config):
+    def __init__(self, GT_file, maxDets=100):
         with open(GT_file, 'r') as ann_file:
             GT_data = json.load(ann_file)
 
         self.image_to_info = {}
         for item in GT_data['images']:
             self.image_to_info[item['filename']] = {'image_id': item['id'], 'height': item['height'], 'width': item['width']}
-        self.maxDets = config['MAX_DETS']
+        self.maxDets = maxDets
         self.areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
         self.areaRngLbl = ['all', 'small', 'medium', 'large']
         self.iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)

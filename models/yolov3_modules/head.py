@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from element import ConvLayer
+from element import ConvLayer, weight_init_kaiming_uniform
 
 
 
@@ -80,6 +80,8 @@ class YOLOv3_head(nn.Module):
                                   input_size=self.input_size,
                                   num_classes=self.num_classes,
                                   anchors=self.anchor_S)
+
+        self.apply(weight_init_kaiming_uniform)
 
 
     def forward(self, x1, x2, x3):
