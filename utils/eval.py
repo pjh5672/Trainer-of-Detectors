@@ -189,9 +189,6 @@ class Evaluator():
         for item in predictions:
             if self.areaRng[0][0] <= item['area'] < self.areaRng[0][1]:
                 items[self.areaRngLbl[0]].append(item)
-            else:
-                raise RuntimeError('exceed areaRng upper bound!')
-                
             if self.areaRng[1][0] <= item['area'] < self.areaRng[1][1]:
                 items[self.areaRngLbl[1]].append(item)
             elif self.areaRng[2][0] <= item['area'] < self.areaRng[2][1]:

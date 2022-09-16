@@ -3,7 +3,7 @@ RESUME_PATH: null
 PRETRAINED_PATH: ./weights/yolov3.pt
 
 #--------------------- Train Parameter ---------------------#
-NUM_EPOCHS: 500
+NUM_EPOCHS: 1000
 INPUT_SIZE: 416
 INPUT_CHANNEL: 3
 BATCH_SIZE: 64

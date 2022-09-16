@@ -384,7 +384,7 @@ def main():
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='name to log training')
     parser.add_argument('--world_size', type=int, default=1, help='number of available GPU devices')
     parser.add_argument('--img_interval', type=int, default=10, help='image logging interval')
-    parser.add_argument('--sgd', action='store_true', help='use of SGD optimizer (default: Adam optimizer)')
+    parser.add_argument('--adam', action='store_true', help='use of Adam optimizer (default: SGD optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')
     parser.add_argument('--start_eval', type=int, default=50, help='starting epoch for mAP evaluation')
