@@ -32,35 +32,36 @@ def execute_val(rank, config, dataloader, model, evaluator):
         for idx in range(len(filenames)):
             filename = filenames[idx]
             max_size = max_sizes[idx]
-            pred_yolo = predictions[idx].cpu().numpy()
-            pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
-            pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
-            pred_yolo = run_NMS_for_YOLO(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'])
-            if len(pred_yolo) > 0:
-                detections.append((filename, pred_yolo, max_size))
+            prediction = predictions[idx].cpu().numpy()
+            prediction[:, :4] = box_transform_xcycwh_to_x1y1x2y2(prediction[:, :4], clip_max=config['INPUT_SIZE'])
+            prediction = filter_obj_score(prediction=prediction, conf_threshold=config['MIN_SCORE_THRESH'])
+            prediction = run_NMS(prediction, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'], class_agnostic=False)
+
+            if len(prediction) > 0:
+                prediction[:, 1:5] /= config['INPUT_SIZE']
+                detections.append((filename, prediction, max_size))
 
     _, eval_text = evaluator(detections)
     return eval_text
 
 
 def main_work(args):
-    with open(args.data_path, mode='r') as f:
+    with open(args.data, mode='r') as f:
         data_item = yaml.load(f, Loader=yaml.FullLoader)
-    with open(args.config_path, mode='r') as f:
+    with open(args.config, mode='r') as f:
         config_item = yaml.load(f, Loader=yaml.FullLoader)
 
     batch_size = config_item['BATCH_SIZE']
     max_dets = config_item['MAX_DETS']
     class_list = data_item['NAMES']
-
     val_set = Dataset(args=args, phase='val', rank=args.rank, time_created=TIMESTAMP)
     val_loader = DataLoader(dataset=val_set, collate_fn=Dataset.collate_fn, batch_size=batch_size, shuffle=False, pin_memory=True)
-    model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list))
-    val_file = args.data_path.parent / data_item['mAP_FILE']
+    model = YOLOv3_Model(config_path=args.config, num_classes=len(class_list))
+    val_file = args.data.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, maxDets=max_dets)
 
-    checkpoint = torch.load(args.model_path, map_location='cpu')
+    checkpoint = torch.load(args.model, map_location='cpu')
     model.load_state_dict(checkpoint['model_state_dict'], strict=True)
     model = model.cuda(args.rank)
 
@@ -70,14 +71,14 @@ def main_work(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='path to data.yaml file')
-    parser.add_argument('--config_path', type=str, default='config/yolov3_coco.yaml', help='path to config.yaml file')
-    parser.add_argument('--model_path', type=str, default='weights/voc_best.pt', help='path to trained model weight')
+    parser.add_argument('--data', type=str, default='data/coco128.yaml', help='path to data.yaml file')
+    parser.add_argument('--config', type=str, default='config/yolov3_coco.yaml', help='path to config.yaml file')
+    parser.add_argument('--model', type=str, default='weights/voc_best.pt', help='path to trained model weight')
     parser.add_argument('--rank', type=int, default=0, help='GPU device index for running')
     args = parser.parse_args()
-    args.data_path = ROOT / args.data_path
-    args.config_path = ROOT / args.config_path
-    args.model_path = ROOT / args.model_path
+    args.data = ROOT / args.data
+    args.config = ROOT / args.config
+    args.model = ROOT / args.model
     torch.cuda.set_device(args.rank)
     main_work(args)
 

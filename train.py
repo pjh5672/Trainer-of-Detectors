@@ -136,12 +136,14 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
             for idx in range(len(filenames)):
                 filename = filenames[idx]
                 max_size = max_sizes[idx]
-                pred_yolo = predictions[idx].cpu().numpy()
-                pred_yolo[:, :4] = clip_box_coordinates(bboxes=pred_yolo[:, :4]/config['INPUT_SIZE'])
-                pred_yolo = filter_obj_score(prediction=pred_yolo, conf_threshold=config['MIN_SCORE_THRESH'])
-                pred_yolo = run_NMS_for_YOLO(prediction=pred_yolo, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'])
-                if len(pred_yolo) > 0:
-                    detections.append((filename, pred_yolo, max_size))
+                prediction = predictions[idx].cpu().numpy()
+                prediction[:, :4] = box_transform_xcycwh_to_x1y1x2y2(prediction[:, :4], clip_max=config['INPUT_SIZE'])
+                prediction = filter_obj_score(prediction=prediction, conf_threshold=config['MIN_SCORE_THRESH'])
+                prediction = run_NMS(prediction, iou_threshold=config['MIN_IOU_THRESH'], maxDets=config['MAX_DETS'], class_agnostic=False)
+
+                if len(prediction) > 0:
+                    prediction[:, 1:5] /= config['INPUT_SIZE']
+                    detections.append((filename, prediction, max_size))
 
         monitor_text = ''
         for loss_name, loss_value in zip(loss_types, losses):
@@ -177,12 +179,12 @@ def main_work(rank, world_size, args, logger):
 
     if OS_SYSTEM == 'Linux':
         setup_worker_logging(rank, logger)
-    shutil.copy(args.data_path, args.exp_path / args.data_path.name)
-    shutil.copy(args.config_path, args.exp_path / args.config_path.name)
+    shutil.copy(args.data, args.exp_path / args.data.name)
+    shutil.copy(args.config, args.exp_path / args.config.name)
 
-    with open(args.data_path, mode='r') as f:
+    with open(args.data, mode='r') as f:
         data_item = yaml.load(f, Loader=yaml.FullLoader)
-    with open(args.config_path, mode='r') as f:
+    with open(args.config, mode='r') as f:
         config_item = yaml.load(f, Loader=yaml.FullLoader)
 
     input_size = config_item['INPUT_SIZE']
@@ -200,8 +202,8 @@ def main_work(rank, world_size, args, logger):
     color_list = generate_random_color(num_colors=len(class_list))
     train_set = Dataset(args=args, phase='train', rank=rank, time_created=TIMESTAMP)
     val_set = Dataset(args=args, phase='val', rank=rank, time_created=TIMESTAMP)
-    model = YOLOv3_Model(config_path=args.config_path, num_classes=len(class_list), freeze_backbone=args.freeze_backbone)
-    criterion = YOLOv3_Loss(config_path=args.config_path, model=model)
+    model = YOLOv3_Model(config_path=args.config, num_classes=len(class_list), freeze_backbone=args.freeze_backbone)
+    criterion = YOLOv3_Loss(config_path=args.config, model=model)
 
     if rank == 0:
         logging.warning(f'{train_set.data_info}')
@@ -214,7 +216,7 @@ def main_work(rank, world_size, args, logger):
     weight_decay *= batch_size * accumulate / nbs  # scale weight_decay
     optimizer = build_optimizer(args=args, model=model, lr=lr0, momentum=momentum, weight_decay=weight_decay)
 
-    val_file = args.data_path.parent / data_item['mAP_FILE']
+    val_file = args.data.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, maxDets=config_item['MAX_DETS'])
 
@@ -377,8 +379,8 @@ def main_work(rank, world_size, args, logger):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='data/coco128.yaml', help='path to data.yaml file')
-    parser.add_argument('--config_path', type=str, default='config/yolov3_coco.yaml', help='path to config.yaml file')
+    parser.add_argument('--data', type=str, default='data/coco128.yaml', help='path to data.yaml file')
+    parser.add_argument('--config', type=str, default='config/yolov3_coco.yaml', help='path to config.yaml file')
     parser.add_argument('--exp_name', type=str, default=str(TIMESTAMP), help='name to log training')
     parser.add_argument('--world_size', type=int, default=1, help='number of available GPU devices')
     parser.add_argument('--img_interval', type=int, default=10, help='image logging interval')
@@ -389,8 +391,8 @@ def main():
     parser.add_argument('--freeze_backbone', action='store_true', help='freeze backbone layers (default: False)')
 
     args = parser.parse_args()
-    args.data_path = ROOT / args.data_path
-    args.config_path = ROOT / args.config_path
+    args.data = ROOT / args.data
+    args.config = ROOT / args.config
     args.exp_path = ROOT / 'experiments' / args.exp_name
     args.weight_dir = args.exp_path / 'models'
     args.image_log_dir = args.exp_path / 'images'

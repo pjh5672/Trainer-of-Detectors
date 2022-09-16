@@ -46,9 +46,6 @@ class YOLOv3_FPN(nn.Module):
         return C1, C2, C3
 
 
-    
-
-
 
 if __name__ == "__main__":
     from backbone import Darknet53_backbone

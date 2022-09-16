@@ -1,6 +1,6 @@
 #--------------------- Weight Parameter ---------------------#
 RESUME_PATH: null
-PRETRAINED_PATH: ./weights/yolov3_coco.pt
+PRETRAINED_PATH: ./weights/yolov3.pt
 
 #--------------------- Train Parameter ---------------------#
 NUM_EPOCHS: 500
@@ -32,7 +32,7 @@ ROTATE: 10
 SHIFT: 0.2
 SCALE: 0.6
 PERSPECTIVE: 0.0001
-MIXUP: 0.2
+MIXUP: 0.1
 
 #--------------------- AP Metric Parameter ---------------------#
 MAX_DETS: 100

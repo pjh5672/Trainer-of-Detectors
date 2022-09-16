@@ -23,6 +23,7 @@ class ConvLayer(nn.Module):
         return out
 
 
+
 class ResBlock(nn.Module):
     def __init__(self, in_channels):
         super().__init__()

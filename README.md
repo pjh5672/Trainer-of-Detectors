@@ -27,7 +27,7 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 31.2 | 55.4 | 61.95 | 65.86 |
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 26.0 | 44.3 | 61.95 | 66.17 |
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | Pascal VOC | trainval2007+2012| test2007 | 416 | - | 76.5 | 61.63 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 48.6 | 72.0 | 61.63 | 65.74 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 48.8 | 72.6 | 61.63 | 65.74 |
 
 
 ### Data Configuraion
@@ -102,8 +102,8 @@ This is repository for source code to train various object detection models. cur
 <details>
 <summary> Training Argument </summary>
 
-  - **`data_path`** : path to data.yaml file
-  - **`config_path`** : path to config.yaml file
+  - **`data`** : path to data.yaml file
+  - **`config`** : path to config.yaml file
   - **`exp_name`** : name to log training
   - **`world_size`** : number of available GPU devices
   - **`img_interval`** : image logging interval
@@ -117,7 +117,7 @@ This is repository for source code to train various object detection models. cur
 
 ```python
 # simple example on parallel training on 2 GPUs
-python train.py --data_path data/coco128.yaml --config config/yolov3_coco.yaml --exp_name train --world_size 2
+python train.py --data data/coco128.yaml --config config/yolov3_coco.yaml --exp_name train --world_size 2
 ```
 
 ### Validate mAP metric
@@ -125,16 +125,16 @@ python train.py --data_path data/coco128.yaml --config config/yolov3_coco.yaml -
 <details>
 <summary> Validating Argument </summary>
 
-  - **`data_path`** : path to data.yaml file
-  - **`config_path`** : path to config.yaml file
-  - **`model_path`** : path to trained model weight
+  - **`data`** : path to data.yaml file
+  - **`config`** : path to config.yaml file
+  - **`model`** : path to trained model weight
   - **`rank`** : GPU device index for running
 
 </details>
 
 ```python
 # simple example on parallel training on 2 GPUs
-python val.py --data_path data/voc.yaml --config config/yolov3_voc.yaml --model_path weight/voc_best.pt
+python val.py --data data/voc.yaml --config config/yolov3_voc.yaml --model weight/voc_best.pt
 ```
 
  - Terminal Output
@@ -260,6 +260,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-16 | add:non-maximum suppression with multi-class & class-agnostic |
 | 09-15 | add:val.py for reproducing mAP with trained model |
 | 09-14 | add:data augmentation with perspective transformation, random crop, mixup |
 | 09-09 | fix:VOC dataset  change for paper performance reproducing |

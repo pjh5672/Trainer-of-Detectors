@@ -23,9 +23,9 @@ from utils import *
 
 class Dataset():
     def __init__(self, args, phase, rank, time_created):
-        with open(args.data_path, mode='r') as f:
+        with open(args.data, mode='r') as f:
             self.data_item = yaml.load(f, Loader=yaml.FullLoader)
-        with open(args.config_path, mode='r') as f:
+        with open(args.config, mode='r') as f:
             self.config_item = yaml.load(f, Loader=yaml.FullLoader)
         
         self.data_dir = Path(self.data_item['PATH'])
@@ -40,9 +40,9 @@ class Dataset():
         self.label_paths = self.replace_image2label_paths(self.image_paths)
         self.generate_no_label(self.label_paths)
 
-        GT_dir = Path(args.data_path).parent / 'evals'
-        cache_dir = Path(args.data_path).parent / 'caches'
-        save_name = Path(args.data_path).name.split('.')[0]
+        GT_dir = Path(args.data).parent / 'evals'
+        cache_dir = Path(args.data).parent / 'caches'
+        save_name = Path(args.data).name.split('.')[0]
          
         if self.phase == 'val':
             self.generate_GT_for_mAP(save_dir=GT_dir, file_name=save_name, phase=phase, rank=rank)
@@ -88,7 +88,6 @@ class Dataset():
     def get_item(self, index):
         filename, image = self.get_image(index)
         class_ids, bboxes = self.get_label(index)
-        bboxes = clip_box_coordinates(bboxes)
         target = np.concatenate((class_ids[:, np.newaxis], bboxes), axis=1)
         return filename, image, target
 
@@ -127,8 +126,8 @@ class Dataset():
         with open(self.label_paths[index], mode="r") as f:
             item = [x.split() for x in f.read().splitlines()]
             label = np.array(item, dtype=np.float32)
-        
         class_ids, bboxes = self.check_no_label(label)
+        bboxes = clip_box_coordinates(bboxes)
         return class_ids, bboxes
     
         
@@ -170,13 +169,11 @@ class Dataset():
 
                 filename, image = self.get_image(index)
                 class_ids, bboxes = self.get_label(index)
-                bboxes = clip_box_coordinates(bboxes)
                 bboxes = box_transform_xcycwh_to_x1y1x2y2(bboxes)
-
-                height, width, _ = image.shape
+                img_h, img_w, _ = image.shape
                 anno_bboxes = bboxes.copy()
-                anno_bboxes[:, [0,2]] *= width
-                anno_bboxes[:, [1,3]] *= height
+                anno_bboxes[:, [0,2]] *= img_w
+                anno_bboxes[:, [1,3]] *= img_h
 
                 for class_id, anno_bbox in zip(class_ids, anno_bboxes):
                     lbl_dict = {}
@@ -191,8 +188,8 @@ class Dataset():
                 img_dict = {}
                 img_dict['id'] = img_id
                 img_dict['filename'] = filename
-                img_dict['height'] = height
-                img_dict['width'] = width
+                img_dict['height'] = img_h
+                img_dict['width'] = img_w
                 eval_data['images'].append(img_dict)
                 img_id += 1
 

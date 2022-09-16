@@ -27,11 +27,11 @@ def clip_box_coordinates(bboxes):
     return bboxes
 
 
-def box_transform_xcycwh_to_x1y1x2y2(bboxes):
+def box_transform_xcycwh_to_x1y1x2y2(bboxes, clip_max=None):
     x1y1 = bboxes[:, :2] - bboxes[:, 2:] / 2
     x2y2 = bboxes[:, :2] + bboxes[:, 2:] / 2
     x1y1x2y2 = np.concatenate((x1y1, x2y2), axis=1)
-    x1y1x2y2 = x1y1x2y2.clip(min=0., max=1.)
+    x1y1x2y2 = x1y1x2y2.clip(min=0., max=clip_max if clip_max is not None else 1.)
     return x1y1x2y2
 
 

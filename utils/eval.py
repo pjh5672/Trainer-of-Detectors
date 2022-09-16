@@ -210,13 +210,11 @@ class Evaluator():
             img_h = self.image_to_info[filename]['height']
             img_w = self.image_to_info[filename]['width']
 
-            pred_voc = pred_yolo.copy()
-            pred_voc[:, 1:5][:,[0,2]] *= (max_size/img_w)
-            pred_voc[:, 1:5][:,[1,3]] *= (max_size/img_h)
-            pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
-            pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=img_w, scale_h=img_h)
+            pred_yolo[:, 1:5][:, [0,2]] *= (max_size/img_w)
+            pred_yolo[:, 1:5][:, [1,3]] *= (max_size/img_h)
+            pred_yolo[:, 1:5] = scale_to_original(pred_yolo[:, 1:5], scale_w=img_w, scale_h=img_h)
 
-            for item in pred_voc:
+            for item in pred_yolo:
                 pred_dict = {}
                 pred_dict['image_id'] = img_id
                 pred_dict['bbox'] = list(item[1:5])

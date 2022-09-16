@@ -9,7 +9,6 @@ FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]
 
 
-
 class Darknet53_backbone(nn.Module):
     def __init__(self, freeze_grad=False):
         super().__init__()

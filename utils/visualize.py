@@ -52,8 +52,6 @@ def visualize_prediction(canvas, detection, conf_threshold, class_list, color_li
     input_size = canvas.shape[0]
     pred_voc = detection[detection[:, 5] >= conf_threshold].copy()
     if len(pred_voc) > 0:
-        pred_voc[:, 1:5] = box_transform_xcycwh_to_x1y1x2y2(pred_voc[:, 1:5])
-        pred_voc[:, 1:5] = scale_to_original(pred_voc[:, 1:5], scale_w=input_size, scale_h=input_size)
         canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)
     return canvas[...,::-1]
 

@@ -37,11 +37,11 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
 
-    config_path = ROOT / 'config' / 'yolov3_coco.yaml'
+    config = ROOT / 'config' / 'yolov3_coco.yaml'
     num_classes = 80
     device = torch.device('cpu')
 
-    model = YOLOv3_Model(config_path=config_path, num_classes=num_classes)
+    model = YOLOv3_Model(config_path=config, num_classes=num_classes)
     model = model.to(device)
     model.eval()
     x = torch.randn(2, 3, 416, 416).to(device)
