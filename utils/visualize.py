@@ -50,6 +50,7 @@ def visualize(image, label, class_list, color_list, show_class=False, show_score
 
 def visualize_prediction(canvas, detection, conf_threshold, class_list, color_list):
     input_size = canvas.shape[0]
+    pred_voc[:, 1:5] *= input_size
     pred_voc = detection[detection[:, 5] >= conf_threshold].copy()
     if len(pred_voc) > 0:
         canvas = visualize(canvas, pred_voc, class_list, color_list, show_class=True, show_score=True)

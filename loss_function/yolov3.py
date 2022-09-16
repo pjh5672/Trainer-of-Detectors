@@ -68,9 +68,9 @@ class YOLOv3_Loss():
             loss_tw = self.mae_loss(pred_tw[b_obj_mask], b_target_tw[b_obj_mask])
             loss_th = self.mae_loss(pred_th[b_obj_mask], b_target_th[b_obj_mask])
             if not torch.isfinite(loss_tw):
-                loss_tw = torch.nan_to_num(loss_tw)
+                loss_tw = torch.nan_to_num(loss_tw, nan=0.0)
             if not torch.isfinite(loss_th):
-                loss_th = torch.nan_to_num(loss_th)
+                loss_th = torch.nan_to_num(loss_th, nan=0.0)
             loss_obj = self.bce_loss(pred_obj_logit[b_obj_mask], b_target_obj[b_obj_mask])
             loss_noobj = self.bce_loss(pred_obj_logit[b_noobj_mask], b_target_obj[b_noobj_mask])
             loss_cls = self.bce_loss(pred_cls_logit[b_obj_mask], b_target_cls[b_obj_mask])
