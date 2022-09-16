@@ -110,8 +110,8 @@ This is repository for source code to train various object detection models. cur
   - **`start_eval`** : starting epoch for mAP evaluation
   - **`linear_lr`** : use of linear LR scheduler (default: one cyclic scheduler)
   - **`no_amp`** : use of FP32 training without AMP (default: AMP training)
-  - **`adam`** : use of Adam optimizer (default: SGD optimizer)
   - **`freeze_backbone`** : freeze backbone layers (default: False)
+  - **`adam`** : use of Adam optimizer (default: SGD optimizer)
 
 </details>
 
