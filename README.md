@@ -260,6 +260,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-17 | add:upload validation files for mAP calculation on voc, coco2017 dataset |
 | 09-16 | add:non-maximum suppression with multi-class & class-agnostic |
 | 09-15 | add:val.py for reproducing mAP with trained model |
 | 09-14 | add:data augmentation with perspective transformation, random crop, mixup |

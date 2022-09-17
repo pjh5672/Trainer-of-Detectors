@@ -5,7 +5,7 @@ TRAIN:
 VAL: 
  - images/val
 
-mAP_FILE: ./evals/coco128_val.json
+mAP_FILE: ./evals/coco2017_val.json
 
 NAMES: {
 0: 'person',
