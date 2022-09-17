@@ -387,7 +387,7 @@ def main():
     parser.add_argument('--adam', action='store_true', help='use of Adam optimizer (default: SGD optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')
-    parser.add_argument('--start_eval', type=int, default=50, help='starting epoch for mAP evaluation')
+    parser.add_argument('--start_eval', type=int, default=20, help='starting epoch for mAP evaluation')
     parser.add_argument('--freeze_backbone', action='store_true', help='freeze backbone layers (default: False)')
 
     args = parser.parse_args()
