@@ -58,7 +58,7 @@ This is repository for source code to train various object detection models. cur
     - **`NUM_EPOCHS`** : number of epochs to train the model
     - **`INPUT_SIZE`** : size of input image (H,W) to be used for model calculation
     - **`INPUT_CHANNEL`** : size of input channel to be used for model calculation
-    - **`BATCH_SIZE`** : size of the mini-batch to be calculated during one iteration of training (recommend setting 128 batch-size or less)
+    - **`BATCH_SIZE`** : size of the mini-batch to be calculated during one iteration of training
     - **`INIT_LEARNING_RATE`** : initial learning rate (recommend setting for SGD: 0.01, Adam: 0.001)
     - **`FINAL_LEARNING_RATE`** : final learning rate
     - **`WEIGHT_DECAY`** : optimizer weight decay
