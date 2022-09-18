@@ -27,7 +27,7 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 31.2 | 55.4 | 61.95 | 65.86 |
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 26.0 | 44.3 | 61.95 | 66.17 |
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | Pascal VOC | trainval2007+2012| test2007 | 416 | - | 76.5 | 61.63 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 51.3 | 77.2 | 61.63 | 65.74 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 51.6 | 77.5 | 61.63 | 65.74 |
 
 
 ### Data Configuraion
