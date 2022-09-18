@@ -27,7 +27,7 @@ This is repository for source code to train various object detection models. cur
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 31.2 | 55.4 | 61.95 | 65.86 |
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 26.0 | 44.3 | 61.95 | 66.17 |
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | Pascal VOC | trainval2007+2012| test2007 | 416 | - | 76.5 | 61.63 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 48.8 | 72.6 | 61.63 | 65.74 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 51.3 | 77.2 | 61.63 | 65.74 |
 
 
 ### Data Configuraion
@@ -58,8 +58,8 @@ This is repository for source code to train various object detection models. cur
     - **`NUM_EPOCHS`** : number of epochs to train the model
     - **`INPUT_SIZE`** : size of input image (H,W) to be used for model calculation
     - **`INPUT_CHANNEL`** : size of input channel to be used for model calculation
-    - **`BATCH_SIZE`** : size of the mini-batch to be calculated during one iteration of training  
-    - **`INIT_LEARNING_RATE`** : initial learning rate
+    - **`BATCH_SIZE`** : size of the mini-batch to be calculated during one iteration of training (recommend setting 128 batch-size or less)
+    - **`INIT_LEARNING_RATE`** : initial learning rate (recommend setting for SGD: 0.01, Adam: 0.001)
     - **`FINAL_LEARNING_RATE`** : final learning rate
     - **`WEIGHT_DECAY`** : optimizer weight decay
     - **`MOMENTUM`** : momentum in SGD/beta1 in Adam optimizer
@@ -260,6 +260,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-18 | fix:exceed baseline performance(mAP) on VOC dataset |
 | 09-17 | add:upload validation files for mAP calculation on voc, coco2017 dataset |
 | 09-16 | add:non-maximum suppression with multi-class & class-agnostic |
 | 09-15 | add:val.py for reproducing mAP with trained model |
