@@ -61,7 +61,7 @@ class YOLOv3_head(nn.Module):
         super().__init__()
         self.input_size = input_size
         self.num_classes = num_classes
-        self.anchor_scale = self.input_size / 416
+        self.anchor_scale = input_size / 416
         self.anchor_L = torch.Tensor(anchors[2]) * self.anchor_scale
         self.anchor_M = torch.Tensor(anchors[1]) * self.anchor_scale
         self.anchor_S = torch.Tensor(anchors[0]) * self.anchor_scale
@@ -102,12 +102,12 @@ if __name__ == "__main__":
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[2]
 
-    with open(ROOT / 'config' / 'yolov3.yaml') as f:
+    with open(ROOT / 'config' / 'yolov3_coco.yaml') as f:
         item = yaml.load(f, Loader=yaml.FullLoader)
 
     input_size = item['INPUT_SIZE']
-    anchors = [x for x in item['ANCHORS'].values()]
     num_classes = 80
+    anchors = list(item['ANCHORS'].values())
     device = torch.device('cpu')
 
     x = torch.randn(1, 3, 416, 416).to(device)

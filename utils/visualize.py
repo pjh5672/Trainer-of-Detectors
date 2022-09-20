@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from general import box_transform_xcycwh_to_x1y1x2y2, scale_to_original
 
@@ -166,3 +166,22 @@ def analyse_mAP_info(mAP_info_area, class_list):
     fig_PR_curves = visualize_PR_curve_per_class(PR_50_PTS_PER_CLASS, class_list)
     figure_detect_rate = visualize_detect_rate_per_class(data_df)
     return data_df, figure_AP, figure_detect_rate, fig_PR_curves
+
+
+def visualize_class_dist(class_ids, class_list, rotation=60):
+    class_ids = Counter(class_ids[class_ids >= 0])
+    class_ids = sort_dict(class_ids)
+    for k, v in class_ids.items():
+        class_ids[k] = [class_list[k], v]
+        
+    data_df = pd.DataFrame.from_dict(data=class_ids, orient='index', columns=['CATEGORY', 'COUNT'])
+    data_df = data_df.reset_index(drop=True)
+
+    plt.figure(figsize=(len(data_df)/4+2, 6))
+    ax = sns.barplot(x='CATEGORY', y='COUNT', data=data_df)
+    ax.set(xlabel='Category', ylabel='Count', title='Category Distribution')
+    plt.grid('on')
+    plt.xticks(rotation=rotation)
+    fig = ax.get_figure()
+    fig.tight_layout()
+    return fig

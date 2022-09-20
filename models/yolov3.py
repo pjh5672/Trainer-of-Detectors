@@ -7,20 +7,15 @@ from yolov3_modules import Darknet53_backbone, YOLOv3_FPN, YOLOv3_head
 
 
 class YOLOv3_Model(nn.Module):
-    def __init__(self, config_path, num_classes, freeze_backbone=False):
+    def __init__(self, input_size, anchors, num_classes, freeze_backbone=False):
         super().__init__()
-        with open(config_path) as f:
-            item = yaml.load(f, Loader=yaml.FullLoader)
-
-        self.input_size = item['INPUT_SIZE']
-        self.anchors = list(item['ANCHORS'].values())
         self.num_classes = num_classes
-        self.num_attribute = 5 + self.num_classes
-        self.num_anchor_per_scale = len(self.anchors[0])
+        self.num_attribute = 5 + num_classes
+        self.num_anchor_per_scale = len(anchors[0])
         self.last_dim_channels = self.num_attribute * self.num_anchor_per_scale
         self.backbone = Darknet53_backbone(freeze_grad=freeze_backbone)
         self.fpn = YOLOv3_FPN()
-        self.head = YOLOv3_head(input_size=self.input_size, num_classes=num_classes, anchors=self.anchors)
+        self.head = YOLOv3_head(input_size=input_size, num_classes=num_classes, anchors=anchors)
         
 
     def forward(self, x):
@@ -32,19 +27,24 @@ class YOLOv3_Model(nn.Module):
 
 
 if __name__ == "__main__":
+    import yaml
     from pathlib import Path
 
     FILE = Path(__file__).resolve()
     ROOT = FILE.parents[1]
 
-    config = ROOT / 'config' / 'yolov3_coco.yaml'
+    with open(ROOT / 'config' / 'yolov3_coco.yaml') as f:
+        item = yaml.load(f, Loader=yaml.FullLoader)
+
+    input_size = item['INPUT_SIZE']
     num_classes = 80
+    anchors = list(item['ANCHORS'].values())
     device = torch.device('cpu')
 
-    model = YOLOv3_Model(config_path=config, num_classes=num_classes)
+    model = YOLOv3_Model(input_size=input_size, anchors=anchors, num_classes=num_classes)
     model = model.to(device)
     model.eval()
-    x = torch.randn(2, 3, 416, 416).to(device)
+    x = torch.randn(2, 3, input_size, input_size).to(device)
     with torch.no_grad():
         predictions = model(x)
 

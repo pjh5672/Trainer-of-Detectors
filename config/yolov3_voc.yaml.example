@@ -15,12 +15,11 @@ WARMUP_EPOCH: 3.0
 WARMUP_MOMENTUM: 0.6
 WARMUP_BIAS_LR: 0.2
 
-GET_PBR: False
-ANCHOR_IOU_THRESHOLD: 0.25
+NUM_ANCHORS: 9
 ANCHORS:
-  ANCHOR_S: [[10, 13], [16, 30], [33, 23]]
-  ANCHOR_M: [[30, 61], [62, 45], [59, 119]]
-  ANCHOR_L: [[116, 90], [156, 198], [373, 326]]
+  ANCHOR_S: [[20, 36], [45, 44], [50, 100]]
+  ANCHOR_M: [[108, 81], [91, 183], [157, 151]]
+  ANCHOR_L: [[298, 142], [186, 259], [337, 226]]
 
 #--------------------- Augment Parameter ---------------------#
 FLIP_UD: 0.0

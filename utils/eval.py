@@ -96,14 +96,14 @@ class Evaluator():
         mAP_5095 /= valid_num_classes
 
         res = {'AP_50_PER_CLASS': AP_50_per_class,
-                'PR_50_PTS_PER_CLASS': PR_50_pts_per_class,
-                'NUM_TRUE_PER_CLASS': num_true_per_class,
-                'NUM_POSITIVE_PER_CLASS': num_positive_per_class,
-                'NUM_TP_50_PER_CLASS': num_TP_50_per_class,
-                'NUM_FP_50_PER_CLASS': num_FP_50_per_class,
-                'mAP_50': mAP_50,
-                'mAP_75': mAP_75,
-                'mAP_5095': mAP_5095}
+               'PR_50_PTS_PER_CLASS': PR_50_pts_per_class,
+               'NUM_TRUE_PER_CLASS': num_true_per_class,
+               'NUM_POSITIVE_PER_CLASS': num_positive_per_class,
+               'NUM_TP_50_PER_CLASS': num_TP_50_per_class,
+               'NUM_FP_50_PER_CLASS': num_FP_50_per_class,
+               'mAP_50': mAP_50,
+               'mAP_75': mAP_75,
+               'mAP_5095': mAP_5095}
         return res
 
 
@@ -119,20 +119,16 @@ class Evaluator():
 
         if num_positive == 0:
             res = {'class': class_id,
-                    'precision_50': 0,
-                    'recall_50': 0,
-                    'total_true': num_true,
-                    'total_positive': num_positive,
-                    'total_TP_50': int(np.sum(TP[0])),
-                    'total_FP_50': int(np.sum(FP[0])),
-                    'AP_50': 0,
-                    'AP_75': 0,
-                    'AP_5095': 0}
+                   'precision_50': 0,
+                   'recall_50': 0,
+                   'total_true': num_true,
+                   'total_positive': num_positive,
+                   'total_TP_50': int(np.sum(TP[0])),
+                   'total_FP_50': int(np.sum(FP[0])),
+                   'AP_50': 0,
+                   'AP_75': 0,
+                   'AP_5095': 0}
             return res
-
-        flag_GT_per_image = {}
-        for image_id in annos_per_class:
-            flag_GT_per_image[image_id] = np.zeros(shape=(len(self.iouThrs), len(annos_per_class[image_id])))
 
         for i in range(len(preds_per_class)):
             pred_in_image = preds_per_class[i]
@@ -143,15 +139,10 @@ class Evaluator():
                 iou = self.get_IoU(pred_in_image['bbox'], anno_in_image[j]['bbox'])
                 if iou > iou_max:
                     iou_max = iou
-                    jmax = j
-            
+
             for k in range(len(self.iouThrs)):
                 if iou_max >= self.iouThrs[k]:
-                    if flag_GT_per_image[pred_in_image['image_id']][k, jmax] == 0:
-                        flag_GT_per_image[pred_in_image['image_id']][k, jmax] = 1
-                        TP[k, i] = 1
-                    else:
-                        FP[k, i] = 1
+                    TP[k, i] = 1
                 else:
                     FP[k, i] = 1
 
@@ -172,15 +163,15 @@ class Evaluator():
         AP_5095 /= len(self.iouThrs)
 
         res = {'class' : class_id,
-                'precision_50' : mprec_50,
-                'recall_50' : mrec_50,
-                'total_true': num_true,
-                'total_positive' : num_positive,
-                'total_TP_50': int(np.sum(TP[0])),
-                'total_FP_50': int(np.sum(FP[0])),
-                'AP_50' : APs[0],
-                'AP_75' : APs[5],
-                'AP_5095' : AP_5095}
+               'precision_50' : mprec_50,
+               'recall_50' : mrec_50,
+               'total_true': num_true,
+               'total_positive' : num_positive,
+               'total_TP_50': int(np.sum(TP[0])),
+               'total_FP_50': int(np.sum(FP[0])),
+               'AP_50' : APs[0],
+               'AP_75' : APs[5],
+               'AP_5095' : AP_5095}
         return res
 
 

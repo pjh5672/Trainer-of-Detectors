@@ -51,18 +51,21 @@ def main_work(args):
     with open(args.config, mode='r') as f:
         config_item = yaml.load(f, Loader=yaml.FullLoader)
 
+    input_size = config_item['INPUT_SIZE']
     batch_size = config_item['BATCH_SIZE']
     max_dets = config_item['MAX_DETS']
+    anchors = list(config_item['ANCHORS'].values())
     class_list = data_item['NAMES']
     val_set = Dataset(args=args, phase='val', rank=args.rank, time_created=TIMESTAMP)
     val_loader = DataLoader(dataset=val_set, collate_fn=Dataset.collate_fn, batch_size=batch_size, shuffle=False, pin_memory=True)
-    model = YOLOv3_Model(config_path=args.config, num_classes=len(class_list))
+    model = YOLOv3_Model(input_size=input_size, anchors=anchors, num_classes=len(class_list))
     val_file = args.data.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, maxDets=max_dets)
 
     checkpoint = torch.load(args.model, map_location='cpu')
-    model.load_state_dict(checkpoint['model_state_dict'], strict=True)
+    # model.load_state_dict(checkpoint['model_state_dict'], strict=True)
+    model.load_state_dict(checkpoint, strict=True)
     model = model.cuda(args.rank)
 
     eval_text = execute_val(rank=args.rank, config=config_item, dataloader=val_loader, model=model, evaluator=evaluator)

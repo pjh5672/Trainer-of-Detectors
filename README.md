@@ -7,9 +7,10 @@
   1-1. [Data Configuraion](#data-configuraion)  
   1-2. [Train Configuraion](#train-configuraion)  
 2. [Usage](#usage)  
-  2-1. [Train Detector](#train-detector)  
-  2-2. [Validate mAP metric](#validate-map-metric)  
-  2-3. [Analyse Result](#analyse-result)  
+  2-1. [Generate Anchor Box](#generate-anchor-box)  
+  2-2. [Train Detector](#train-detector)  
+  2-3. [Validate mAP metric](#validate-map-metric)  
+  2-4. [Analyse Result](#analyse-result)  
 3. [Update](#update)   
 4. [Contact](#contact)
 
@@ -26,8 +27,8 @@ This is repository for source code to train various object detection models. cur
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 31.2 | 55.4 | 61.95 | 65.86 |
 | YOLOv3<br><sup>(<u>Our:star:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 26.0 | 44.3 | 61.95 | 66.17 |
-| YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | Pascal VOC | trainval2007+2012| test2007 | 416 | - | 76.5 | 61.63 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 52.0 | 77.6 | 61.63 | 65.74 |
+| YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | Pascal VOC | trainval2007+2012| test2007 | 416 | - | 82.0 | 61.63 | 65.86 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 45.9 | 84.5 | 61.63 | 65.74 |
 
 
 ### Data Configuraion
@@ -66,8 +67,7 @@ This is repository for source code to train various object detection models. cur
     - **`WARMUP_EPOCH`** : warmup epochs for stable initial training
     - **`WARMUP_MOMENTUM`** : warmup initial momentum
     - **`WARMUP_BIAS_LR`** : warmup initial bias lr
-    - **`GET_PBR`** : mode on/off for calculate possible best recalls
-    - **`ANCHOR_IOU_THRESHOLD`** : minimum threshold of overlap size with the predefined anchors to transform into learnable targets
+    - **`NUM_ANCHORS`** : number of anchors
     - **`ANCHORS`** : the width and height of the predefined anchor boxes for small/medium/large scale
 
   - **Augment Parameter**
@@ -96,6 +96,32 @@ This is repository for source code to train various object detection models. cur
 
 
 ## [Usage]
+
+### Generate Anchor Box
+
+<details>
+<summary> Generator Argument </summary>
+
+  - **`data`** : path to data.yaml file
+  - **`config`** : path to config.yaml file
+  - **`img_size`** : input image size
+  - **`n_cluster`** : number of anchor for generating best fit clusters with k-means clustering
+
+</details>
+
+```python
+# simple example
+python gen_anchor.py --data data/coco128.yaml --img_size 416 --n_cluster 9
+
+# output (with saving figure with class distribution in data directory)
+Best Possible Recalls (BPR): 0.9987
+Best Fit Anchors: [[22.0, 34.0], [46.0, 47.0], [51.0, 101.0], [110.0, 87.0], [102.0, 178.0], [176.0, 142.0], [303.0, 156.0], [187.0, 260.0], [347.0, 263.0]]
+```
+
+<div align="center">
+   <a href=""><img src=./asset/coco128_dist.png width="95%" /></a>
+</div>
+
 
 ### Train Detector
 
@@ -260,6 +286,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-20 | add:generator best anchor box with K-means clustering & genetic algorithm |
 | 09-18 | fix:exceed baseline performance(mAP) on VOC dataset |
 | 09-17 | add:upload validation files for mAP calculation on voc, coco2017 dataset |
 | 09-16 | add:non-maximum suppression with multi-class & class-agnostic |

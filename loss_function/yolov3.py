@@ -12,8 +12,6 @@ ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from utils import get_IoU_target_with_anchor
-
 
 
 class YOLOv3_Loss():
@@ -21,15 +19,15 @@ class YOLOv3_Loss():
         super().__init__()
         with open(config_path) as f:
             item = yaml.load(f, Loader=yaml.FullLoader)
-
         self.input_size = item['INPUT_SIZE']
+        self.input_channel = item['INPUT_CHANNEL']
         self.ignore_threshold = item['IGNORE_THRESH']
         self.coeff_coord = item['COEFFICIENT_COORD']
         self.coeff_noobj = item['COEFFICIENT_NOOBJ']
         self.num_classes = model.num_classes
         self.num_anchor_per_scale = model.num_anchor_per_scale
 
-        dummy_x = torch.randn(1, 3, self.input_size, self.input_size)
+        dummy_x = torch.randn(1, self.input_channel, self.input_size, self.input_size)
         with torch.no_grad():
             self.dummy_y = model(dummy_x)
 
@@ -104,13 +102,21 @@ class YOLOv3_Loss():
         th = torch.log(bh / anchor_h)
         return tx, ty, tw, th
 
+    
+    def get_IoU_target_with_anchor(self, wh1, wh2):
+        w1, h1 = wh1
+        w2, h2 = wh2
+        inter_area = torch.min(w1, w2) * torch.min(h1, h2)
+        union_area = (w1 * h1) + (w2 * h2) - inter_area
+        return inter_area / union_area
+
 
     def build_target_mask(self, grid_ij, target_xy, target_wh, anchor_each_scale):
         obj_mask = torch.zeros(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
                                device=self.device, dtype=torch.float32)
         noobj_mask = torch.ones(size=(self.num_anchor_per_scale, self.grid_size, self.grid_size), 
                                 device=self.device, dtype=torch.float32)
-        iou_target_with_anchor = [get_IoU_target_with_anchor(target_wh.t(), anchor) for anchor in anchor_each_scale]
+        iou_target_with_anchor = [self.get_IoU_target_with_anchor(target_wh.t(), anchor) for anchor in anchor_each_scale]
         iou_target_with_anchor = torch.stack(iou_target_with_anchor, dim=0)
         best_iou, best_anchor_index = iou_target_with_anchor.max(dim=0)
 

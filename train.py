@@ -174,13 +174,16 @@ def execute_val(rank, world_size, args, config, dataloader, model, criterion, cl
 
 
 def main_work(rank, world_size, args, logger):
-    ################################### Init Params ###################################
-    global current_epoch, nbs, nw, lf, momentum, accumulate, batch_size, warmup_bias_lr, warmup_momentum, last_opt_step
+    ################################### Init Process ###################################
+    setup(rank, world_size)
+    torch.manual_seed(seed_num)
+    torch.cuda.set_device(rank)
 
     if OS_SYSTEM == 'Linux':
         setup_worker_logging(rank, logger)
-    shutil.copy(args.data, args.exp_path / args.data.name)
-    shutil.copy(args.config, args.exp_path / args.config.name)
+
+    ################################### Init Instance ###################################
+    global current_epoch, nbs, nw, lf, momentum, accumulate, batch_size, warmup_bias_lr, warmup_momentum, last_opt_step
 
     with open(args.data, mode='r') as f:
         data_item = yaml.load(f, Loader=yaml.FullLoader)
@@ -194,15 +197,24 @@ def main_work(rank, world_size, args, logger):
     weight_decay = config_item['WEIGHT_DECAY']
     num_epochs = config_item['NUM_EPOCHS']
     momentum = config_item['MOMENTUM']
-    batch_size = config_item['BATCH_SIZE']
+    batch_size = int(config_item['BATCH_SIZE']/world_size)
     warmup_epoch = config_item['WARMUP_EPOCH']
     warmup_momentum = config_item['WARMUP_MOMENTUM']
     warmup_bias_lr = config_item['WARMUP_BIAS_LR']
+    anchors = list(config_item['ANCHORS'].values())
     class_list = data_item['NAMES']
     color_list = generate_random_color(num_colors=len(class_list))
+
     train_set = Dataset(args=args, phase='train', rank=rank, time_created=TIMESTAMP)
     val_set = Dataset(args=args, phase='val', rank=rank, time_created=TIMESTAMP)
-    model = YOLOv3_Model(config_path=args.config, num_classes=len(class_list), freeze_backbone=args.freeze_backbone)
+    num_workers = min([os.cpu_count() // max(torch.cuda.device_count(), 1), batch_size if batch_size > 1 else 0, world_size*4])
+    train_sampler = distributed.DistributedSampler(train_set, num_replicas=world_size, rank=rank, shuffle=True)
+    val_sampler = distributed.DistributedSampler(val_set, num_replicas=world_size, rank=rank, shuffle=False)
+    train_loader = DataLoader(dataset=train_set, collate_fn=Dataset.collate_fn, batch_size=batch_size, shuffle=False,
+                              num_workers=num_workers, pin_memory=True, sampler=train_sampler)
+    val_loader = DataLoader(dataset=val_set, collate_fn=Dataset.collate_fn, batch_size=batch_size, shuffle=False,
+                            num_workers=num_workers, pin_memory=True, sampler=val_sampler)
+    model = YOLOv3_Model(input_size=input_size, anchors=anchors, num_classes=len(class_list), freeze_backbone=args.freeze_backbone)
     criterion = YOLOv3_Loss(config_path=args.config, model=model)
 
     if rank == 0:
@@ -227,44 +239,8 @@ def main_work(rank, world_size, args, logger):
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scaler = amp.GradScaler(enabled=not args.no_amp)
 
-    ################################### Init Process ###################################
-    setup(rank, world_size)
-
-    ################################### Init Loader ####################################
-    batch_size = int(batch_size/world_size)
-    num_workers = min([os.cpu_count() // max(torch.cuda.device_count(), 1), batch_size if batch_size > 1 else 0, world_size*4])
-    train_sampler = distributed.DistributedSampler(train_set, num_replicas=world_size, rank=rank, shuffle=True)
-    val_sampler = distributed.DistributedSampler(val_set, num_replicas=world_size, rank=rank, shuffle=False)
-    train_loader = DataLoader(dataset=train_set, collate_fn=Dataset.collate_fn, batch_size=batch_size, shuffle=False,
-                              num_workers=num_workers, pin_memory=True, sampler=train_sampler)
-    val_loader = DataLoader(dataset=val_set, collate_fn=Dataset.collate_fn, batch_size=batch_size, shuffle=False,
-                            num_workers=num_workers, pin_memory=True, sampler=val_sampler)
-
-    ################################### Calculate BPR ####################################
-    if config_item['GET_PBR']:
-        dataloader = tqdm(train_loader, desc='Calculating Best Possible Rate(BPR)...', ncols=115, leave=False) if rank == 0 else train_loader
-        num_anchor_per_scale = criterion.num_anchor_per_scale
-        anchors = criterion.anchors
-        strides = criterion.strides
-        anchor_iou_threshold = config_item['ANCHOR_IOU_THRESHOLD']
-        total_n_train, total_n_target = check_best_possible_recall(dataloader, input_size, num_anchor_per_scale, anchors, strides, anchor_iou_threshold)
-
-        if OS_SYSTEM == 'Linux':
-            total_n_train = torch.tensor(total_n_train).cuda(rank)
-            total_n_target = torch.tensor(total_n_target).cuda(rank)
-            dist.all_reduce(total_n_train, op=dist.ReduceOp.SUM)
-            dist.all_reduce(total_n_target, op=dist.ReduceOp.SUM)
-
-        if rank == 0:
-            message = f'Best Possible Rate: {total_n_train/total_n_target:.4f}, Train_target/Total_target: {total_n_train}/{total_n_target}'
-            logging.warning(message)
-        del dataloader
-
     #################################### Init Model ####################################
-    torch.manual_seed(seed_num)
-    torch.cuda.set_device(rank)
     model = model.cuda(rank)
-
     if OS_SYSTEM == 'Linux':
         model = DDP(model, device_ids=[rank])
 
@@ -308,7 +284,6 @@ def main_work(rank, world_size, args, logger):
 
     for i in pbar:
         current_epoch = i
-
         if rank == 0:
             message = f'[Epoch:{current_epoch:03d}/{num_epochs:03d}]'
             pbar.set_description(desc=message)
@@ -387,7 +362,7 @@ def main():
     parser.add_argument('--adam', action='store_true', help='use of Adam optimizer (default: SGD optimizer)')
     parser.add_argument('--linear_lr', action='store_true', help='use of linear LR scheduler (default: one cyclic scheduler)')
     parser.add_argument('--no_amp', action='store_true', help='use of FP32 training (default: AMP training)')
-    parser.add_argument('--start_eval', type=int, default=20, help='starting epoch for mAP evaluation')
+    parser.add_argument('--start_eval', type=int, default=10, help='starting epoch for mAP evaluation')
     parser.add_argument('--freeze_backbone', action='store_true', help='freeze backbone layers (default: False)')
 
     args = parser.parse_args()
@@ -409,6 +384,8 @@ def main():
         for k, v in vars(args).items():
             args_dict[k] = str(v) if isinstance(v, Path) else v
         yaml.safe_dump(args_dict, f, sort_keys=False)
+    shutil.copy(args.data, args.exp_path / args.data.name)
+    shutil.copy(args.config, args.exp_path / args.config.name)
 
     #########################################################
     # Set multiprocessing type to spawn
