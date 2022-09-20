@@ -30,7 +30,7 @@ def hard_NMS(bboxes, scores, iou_threshold):
         h = np.maximum(0, yy2 - yy1 + 1)
         overlap = (w * h)
         ious = overlap / (areas[order[0]] + areas[order[1:]] - overlap + 1e-8)
-        order = order[np.where(ious <= iou_threshold)[0] + 1]
+        order = order[np.where(ious < iou_threshold)[0] + 1]
     return pick
 
 
