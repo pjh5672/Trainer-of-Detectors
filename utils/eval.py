@@ -130,6 +130,10 @@ class Evaluator():
                    'AP_5095': 0}
             return res
 
+        flag_GT_per_image = {}
+        for image_id in annos_per_class:
+            flag_GT_per_image[image_id] = np.zeros(shape=(len(self.iouThrs), len(annos_per_class[image_id])))
+
         for i in range(len(preds_per_class)):
             pred_in_image = preds_per_class[i]
             anno_in_image = annos_per_class[pred_in_image['image_id']]
@@ -139,10 +143,15 @@ class Evaluator():
                 iou = self.get_IoU(pred_in_image['bbox'], anno_in_image[j]['bbox'])
                 if iou > iou_max:
                     iou_max = iou
+                    jmax = j
 
             for k in range(len(self.iouThrs)):
                 if iou_max >= self.iouThrs[k]:
-                    TP[k, i] = 1
+                    if flag_GT_per_image[pred_in_image['image_id']][k, jmax] == 0:
+                        flag_GT_per_image[pred_in_image['image_id']][k, jmax] = 1
+                        TP[k, i] = 1
+                    else:
+                        continue
                 else:
                     FP[k, i] = 1
 

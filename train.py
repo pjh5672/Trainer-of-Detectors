@@ -327,8 +327,8 @@ def main_work(rank, world_size, args, logger):
                              'scaler_state_dict': scaler.state_dict()}
                 save_model(model=save_item, save_path=args.weight_dir / 'last.pt')
 
-                if mAP_info['all']['mAP_50'] > best_mAP:
-                    best_mAP = mAP_info['all']['mAP_50']
+                if mAP_info['all']['mAP_5095'] > best_mAP:
+                    best_mAP = mAP_info['all']['mAP_5095']
                     best_epoch = current_epoch
                     best_perf = eval_text
                     save_model(model=save_item, save_path=args.weight_dir / 'best.pt')
@@ -345,7 +345,7 @@ def main_work(rank, world_size, args, logger):
                         fig_PR_curves[class_id].clf()
 
     if (rank == 0) and (best_perf is not None):
-        logging.warning(f' Best mAP@0.5: {best_mAP:.3f} at [Epoch:{best_epoch}/{num_epochs}]')
+        logging.warning(f' Best mAP@0.5:0.95: {best_mAP:.3f} at [Epoch:{best_epoch}/{num_epochs}]')
         logging.warning(best_perf)
 
     cleanup()

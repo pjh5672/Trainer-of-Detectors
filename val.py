@@ -62,12 +62,9 @@ def main_work(args):
     val_file = args.data.parent / data_item['mAP_FILE']
     assert val_file.is_file(), RuntimeError(f'Not exist val file, expected {val_file}')
     evaluator = Evaluator(GT_file=val_file, maxDets=max_dets)
-
     checkpoint = torch.load(args.model, map_location='cpu')
-    # model.load_state_dict(checkpoint['model_state_dict'], strict=True)
-    model.load_state_dict(checkpoint, strict=True)
+    model.load_state_dict(checkpoint['model_state_dict'], strict=True)
     model = model.cuda(args.rank)
-
     eval_text = execute_val(rank=args.rank, config=config_item, dataloader=val_loader, model=model, evaluator=evaluator)
     print(eval_text)
 
@@ -76,7 +73,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type=str, default='data/coco128.yaml', help='path to data.yaml file')
     parser.add_argument('--config', type=str, default='config/yolov3_coco.yaml', help='path to config.yaml file')
-    parser.add_argument('--model', type=str, default='weights/voc_best.pt', help='path to trained model weight')
+    parser.add_argument('--model', type=str, default='weights/voc-b64/model/best.pt', help='path to trained model weight')
     parser.add_argument('--rank', type=int, default=0, help='GPU device index for running')
     args = parser.parse_args()
     args.data = ROOT / args.data
