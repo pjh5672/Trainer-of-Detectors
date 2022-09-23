@@ -2,7 +2,7 @@ import yaml
 import torch
 import torch.nn as nn
 
-from yolov3_modules import Darknet53_backbone, YOLOv3_FPN, YOLOv3_head
+from yolov3_modules import Darknet53, YOLOv3_FPN, YOLOv3_head
 
 
 
@@ -13,7 +13,7 @@ class YOLOv3_Model(nn.Module):
         self.num_attribute = 5 + num_classes
         self.num_anchor_per_scale = len(anchors[0])
         self.last_dim_channels = self.num_attribute * self.num_anchor_per_scale
-        self.backbone = Darknet53_backbone(freeze_grad=freeze_backbone)
+        self.backbone = Darknet53(freeze_grad=freeze_backbone)
         self.fpn = YOLOv3_FPN()
         self.head = YOLOv3_head(input_size=input_size, num_classes=num_classes, anchors=anchors)
         

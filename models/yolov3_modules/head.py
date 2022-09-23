@@ -96,7 +96,7 @@ if __name__ == "__main__":
     import yaml
     from pathlib import Path
 
-    from backbone import Darknet53_backbone
+    from backbone import Darknet53
     from neck import YOLOv3_FPN
 
     FILE = Path(__file__).resolve()
@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
     x = torch.randn(1, 3, 416, 416).to(device)
     num_classes = 80
-    backbone = Darknet53_backbone().to(device)
+    backbone = Darknet53().to(device)
     fpn = YOLOv3_FPN().to(device)
     head = YOLOv3_head(input_size=input_size, num_classes=num_classes, anchors=anchors)
 

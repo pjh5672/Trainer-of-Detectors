@@ -48,10 +48,10 @@ class YOLOv3_FPN(nn.Module):
 
 
 if __name__ == "__main__":
-    from backbone import Darknet53_backbone
+    from backbone import Darknet53
     
     x = torch.randn(1, 3, 416, 416)
-    backbone = Darknet53_backbone()
+    backbone = Darknet53()
     fpn_module = YOLOv3_FPN()
 
     with torch.no_grad():

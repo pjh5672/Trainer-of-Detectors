@@ -9,7 +9,7 @@ FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]
 
 
-class Darknet53_backbone(nn.Module):
+class Darknet53(nn.Module):
     def __init__(self, freeze_grad=False):
         super().__init__()
         self.conv1 = ConvLayer(3, 32, 3, stride=1, padding=1)
@@ -44,17 +44,10 @@ class Darknet53_backbone(nn.Module):
         return model
 
 
-    def _weight_init_kaiming_uniform(self, module):
-        if isinstance(module, nn.Conv2d):
-            nn.init.kaiming_uniform_(module.weight)
-        elif isinstance(module, nn.BatchNorm2d):
-            module.weight.data.fill_(1.0)
-
-
 
 if __name__ == "__main__":
     x = torch.randn(1, 3, 416, 416)
-    backbone = Darknet53_backbone()
+    backbone = Darknet53()
     backbone.eval()
     with torch.no_grad():
         features = backbone(x)

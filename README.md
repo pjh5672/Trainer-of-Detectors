@@ -286,6 +286,7 @@ $ pip install -r requirements.txt
 
 | Date | Content |
 |:----:|:-----|
+| 09-23 | fix:rename yolov3 class architecture |
 | 09-21 | fix:change save-point baseline of mAP@0.5 -> 0.5:0.95 |
 | 09-20 | add:generator best anchor box with K-means clustering & genetic algorithm |
 | 09-18 | fix:exceed baseline performance(mAP) on VOC dataset |
