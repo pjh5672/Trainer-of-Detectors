@@ -26,9 +26,9 @@ This is repository for source code to train various object detection models. cur
 | Model | Dataset | Train | Valid | Size<br><sup>(pixel) | mAP<br><sup>(@0.5:0.95) | mAP<br><sup>(@0.5) | Params<br><sup>(M) | FLOPS<br><sup>(B) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | 
 | YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 31.2 | 55.4 | 61.95 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 26.0 | 44.3 | 61.95 | 66.17 |
-| YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | Pascal VOC | trainval2007+2012| test2007 | 416 | - | 82.0 | 61.63 | 65.86 |
-| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 45.9 | 84.5 | 61.63 | 65.74 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | MS-COCO | train2017 | val2017 | 416 | 29.1 | 50.2 | 61.95 | 66.17 |
+| YOLOv3<br><sup>(<u>Paper:page_with_curl:</u>)</br> | Pascal VOC | trainval2007+2012| test2007 | 416 | - | 78.1 | 61.63 | 65.86 |
+| YOLOv3<br><sup>(<u>Our:star:</u>)</br> | Pascal VOC | trainval2007+2012 | test2007 | 416 | 52.5 | 77.8 | 61.63 | 65.74 |
 
 
 ### Data Configuraion
